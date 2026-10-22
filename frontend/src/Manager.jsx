@@ -20,7 +20,7 @@ export default function Manager() {
     } catch (err) {
       console.error("Error fetching menu:", err);
       setError('Failed to load menu items. Please check your connection.');
-      setLoading(falsgit add .e);
+      setLoading(false);
     }
   };
 
