@@ -7,10 +7,6 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "@boba/database": ["../../packages/database/src/index.ts"],
-      "@boba/lib": ["../../packages/lib/src/types.ts"]
-    }
   },
   "include": ["src/**/*"]
 }

@@ -1,0 +1,13 @@
+
+> @boba/database@1.0.0 build
+> npx prisma generate && tsc
+
+⠙[1G[0K[2mPrisma schema loaded from prisma/schema.prisma[22m
+
+✔ Generated [1mPrisma Client[22m (v5.22.0)[2m to ./../../node_modules/@prisma/client[22m in 27ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Help us improve the Prisma ORM for everyone. Share your feedback in a short 2-min survey: https://pris.ly/orm/survey/release-5-22
+
+⠙[1G[0K⠙[1G[0K

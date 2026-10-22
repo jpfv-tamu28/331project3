@@ -1,16 +1,14 @@
 {
   "name": "boba-kiosk-monorepo",
   "version": "1.0.0",
-  "private": true,
-  "packageManager": "npm@10.2.4",
+  "packageManager": "npm@11.19.1",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint"
+    "dev": "turbo run dev"
   },
   "devDependencies": {
     "turbo": "latest"
