@@ -15,7 +15,7 @@ backend/            Express API (port 3001)
   src/routes/       menu, inventory, employees, orders, reports
 frontend/           React + Vite app (port 5173 in dev)
   src/Portal.jsx    entry screen: pick Kiosk, Cashier or Manager
-  src/Kiosk.jsx     Customer Kiosk (placeholder)
+  src/Kiosk.jsx     Customer Kiosk (+ src/kiosk/: cart panel, drink illustrations)
   src/Cashier.jsx   order entry (+ src/cashier/: customize dialog, order history, pricing)
   src/Manager.jsx   dashboard tabs (+ src/manager/: menu, inventory, employees, reports, X-report, product usage)
   src/components/   shared UI (modal, toasts, tables, dense list, app shell)
@@ -43,7 +43,7 @@ Vite forwards `/api/*` to `localhost:3001`, so no CORS setup is needed in develo
 | Route | What |
 |---|---|
 | `/` | Portal: choose Customer Kiosk, Cashier or Manager. No sign-in. |
-| `/kiosk` | Customer Kiosk (placeholder until Phase 3). |
+| `/kiosk` | Self-order kiosk for a landscape iPad: menu sections scroll left to right with two rows of large square tiles; section tabs across the top jump between them; tapping a tile opens the same customize dialog the cashier uses; the cart button (top left) opens and closes the order panel; placing an order shows the order number and resets after 20 seconds. |
 | `/cashier` | Menu grid with category tabs and search, drink customization (size, ice, sugar incl. 200%, add-ons ×1–5, quantity), current order with tax, discount code, payment method, order history. |
 | `/manager` | Menu items (add, edit, seasonal item with recipe), inventory (low-stock grouping), employees, sales reports, X-report, product usage chart. |
 
@@ -94,4 +94,5 @@ and set `CORS_ORIGIN=https://<frontend-host>` on the API.
 - Payment method is sent with each order but not stored; `orders` has no column for it yet.
 - `orders`, `menu_items` and `employees` IDs are not `SERIAL`, so new IDs are `MAX + 1` under a table lock.
   Switching those columns to identity columns would remove the lock.
-- Customer Kiosk and Portal Hub views (Phase 3) are not built yet.
+- The menu has no photos, so kiosk tiles show an illustrated cup colored from the drink's name (`src/kiosk/DrinkArt.jsx`).
+  An `image_url` column on `menu_items` would let real photos replace it.

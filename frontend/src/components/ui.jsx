@@ -97,7 +97,7 @@ export const useToast = () => useContext(ToastContext);
  */
 export function Modal({
   title, onClose, onSubmit, submitLabel = 'OK', cancelLabel = 'Cancel', tone, width,
-  busy = false, headerAction, children,
+  busy = false, headerAction, className = '', children,
 }) {
   const ref = useRef(null);
   const titleId = useId();
@@ -113,7 +113,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={`modal ${className}`.trim()}
       aria-labelledby={titleId}
       style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined}
       onCancel={(e) => {

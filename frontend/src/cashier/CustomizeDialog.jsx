@@ -9,7 +9,7 @@ import {
  * Size / ice / sugar / add-ons / quantity for one drink (Cashier.openCustomizationDialog).
  * existing is the order line being edited, or null to add a new one.
  */
-export default function CustomizeDialog({ item, toppings, existing, onSave, onClose }) {
+export default function CustomizeDialog({ item, toppings, existing, onSave, onClose, className, width = 480 }) {
   const [size, setSize] = useState(existing?.size ?? 'M');
   const [ice, setIce] = useState(existing?.ice ?? '100%');
   const [sugar, setSugar] = useState(existing?.sugar ?? '100%');
@@ -36,7 +36,8 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
       submitLabel={existing ? 'Save Changes' : 'Add to Order'}
       onSubmit={() => onSave(line)}
       onClose={onClose}
-      width={480}
+      width={width}
+      className={className}
     >
       <div className="customize">
         <p className="muted">{item.category} · {money(item.priceCents)}</p>
