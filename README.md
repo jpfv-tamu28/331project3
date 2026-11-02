@@ -20,12 +20,11 @@ frontend/           React + Vite app (port 5173 in dev)
   src/Manager.jsx   dashboard tabs (+ src/manager/: menu, inventory, employees, reports, X-report, product usage)
   src/components/   shared UI (modal, toasts, tables, dense list, app shell)
 database/           schema (setup.sql) and Project 2 queries
-src/                Project 2 Java Swing app (reference for the web screens)
 ```
 
 ## Running locally
 
-Requires Node 20+. Run these from the project root (the folder with this README):
+Requires Node 20+
 
 ```bash
 cp backend/.env.example backend/.env   # then set DB_PASSWORD in backend/.env
@@ -34,14 +33,7 @@ npm run dev                            # starts the API (:3001) and the React ap
 ```
 
 Open http://localhost:5173. http://localhost:5173/api/health should report `"database": "connected"`.
-If it reports `no pg_hba.conf entry ... no encryption`, set `DB_SSL=true` in `backend/.env`: the TAMU server only
-accepts encrypted connections from off-campus addresses.
-
-The sales history in the database currently ends on 2026-10-15, so date-based reports (and the X-Report) only show
-data for dates up to then.
-Stop both with Ctrl+C.
-
-Vite forwards `/api/*` to `localhost:3001`, so no CORS setup is needed in development.
+Make sure you are on TAMU Wifi or TAMU VPN.
 
 ## How the screens work
 
@@ -83,22 +75,6 @@ can't be changed from the browser. The order and its lines are written in one tr
 
 ## Deploying to Render
 
-One Web Service can host both halves: Express serves the built React app.
-
 - **Build command:** `npm install && npm run build`
 - **Start command:** `npm start`
 - **Environment:** `DB_PASSWORD` (plus the other `DB_*` values from `backend/.env.example` if they differ). Render sets `PORT`.
-
-If the frontend is instead deployed as a separate static site, build it with `VITE_API_URL=https://<api-host>/api`
-and set `CORS_ORIGIN=https://<frontend-host>` on the API.
-
-## Known gaps / next steps
-
-- **There is no sign-in.** Anyone who can open the site, or call the API directly, can use the Manager view and
-  its routes. Employee PINs are still stored and editable for when sign-in comes back.
-- The live `orders` table has a `payment_method` column (`'Card' | 'Cash' | 'Gift Card'`, default `'Card'`) that
-  `database/setup.sql` doesn't create yet; the API fills it in. Add it to `setup.sql` so a rebuilt database matches.
-- `orders`, `menu_items` and `employees` IDs are not `SERIAL`, so new IDs are `MAX + 1` under a table lock.
-  Switching those columns to identity columns would remove the lock.
-- The menu has no photos, so kiosk tiles show an illustrated cup colored from the drink's name (`src/kiosk/DrinkArt.jsx`).
-  An `image_url` column on `menu_items` would let real photos replace it.
