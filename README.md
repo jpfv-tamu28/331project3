@@ -34,6 +34,11 @@ npm run dev                            # starts the API (:3001) and the React ap
 ```
 
 Open http://localhost:5173. http://localhost:5173/api/health should report `"database": "connected"`.
+If it reports `no pg_hba.conf entry ... no encryption`, set `DB_SSL=true` in `backend/.env`: the TAMU server only
+accepts encrypted connections from off-campus addresses.
+
+The sales history in the database currently ends on 2026-10-15, so date-based reports (and the X-Report) only show
+data for dates up to then.
 Stop both with Ctrl+C.
 
 Vite forwards `/api/*` to `localhost:3001`, so no CORS setup is needed in development.
@@ -91,7 +96,8 @@ and set `CORS_ORIGIN=https://<frontend-host>` on the API.
 
 - **There is no sign-in.** Anyone who can open the site, or call the API directly, can use the Manager view and
   its routes. Employee PINs are still stored and editable for when sign-in comes back.
-- Payment method is sent with each order but not stored; `orders` has no column for it yet.
+- The live `orders` table has a `payment_method` column (`'Card' | 'Cash' | 'Gift Card'`, default `'Card'`) that
+  `database/setup.sql` doesn't create yet; the API fills it in. Add it to `setup.sql` so a rebuilt database matches.
 - `orders`, `menu_items` and `employees` IDs are not `SERIAL`, so new IDs are `MAX + 1` under a table lock.
   Switching those columns to identity columns would remove the lock.
 - The menu has no photos, so kiosk tiles show an illustrated cup colored from the drink's name (`src/kiosk/DrinkArt.jsx`).

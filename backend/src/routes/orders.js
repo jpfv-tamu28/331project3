@@ -13,7 +13,8 @@ const ICE_LEVELS = ['0%', '50%', '100%'];
 const SUGAR_LEVELS = ['0%', '50%', '100%', '200%'];
 const MAX_TOPPING_COUNT = 5;
 const MAX_QUANTITY = 99;
-const PAYMENT_METHODS = ['card', 'cash', 'giftcard'];
+// API value -> the value orders.payment_method accepts (its CHECK constraint allows exactly these three).
+const PAYMENT_METHODS = { card: 'Card', cash: 'Cash', giftcard: 'Gift Card' };
 
 function lookupDiscount(code) {
   if (typeof code !== 'string' || code.trim() === '') return null;
@@ -36,7 +37,7 @@ router.get('/', asyncRoute(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT o.order_id AS id, to_char(o.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
             COALESCE(e.name, 'Employee #' || o.employee_id, 'Unassigned') AS cashier,
-            o.status, o.total_cents AS "totalCents"
+            o.status, o.payment_method AS "paymentMethod", o.total_cents AS "totalCents"
      FROM orders o LEFT JOIN employees e ON o.employee_id = e.employee_id
      ORDER BY o.created_at DESC, o.order_id DESC LIMIT $1`,
     [limit],
@@ -88,8 +89,8 @@ router.post('/', asyncRoute(async (req, res) => {
   const employeeId = req.body?.employeeId == null ? null : requireId(req.body.employeeId, 'Employee');
   const lines = parseLines(req.body?.items);
   const paymentMethod = String(req.body?.paymentMethod ?? 'card').toLowerCase();
-  if (!PAYMENT_METHODS.includes(paymentMethod)) {
-    throw new HttpError(400, `Payment method must be one of: ${PAYMENT_METHODS.join(', ')}.`);
+  if (!(paymentMethod in PAYMENT_METHODS)) {
+    throw new HttpError(400, `Payment method must be one of: ${Object.keys(PAYMENT_METHODS).join(', ')}.`);
   }
   const discount = lookupDiscount(req.body?.discountCode);
   if (req.body?.discountCode && !discount) {
@@ -128,10 +129,10 @@ router.post('/', asyncRoute(async (req, res) => {
     // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
     await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
     const { rows: [{ id: orderId }] } = await client.query(
-      `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents)
-       VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2)
+      `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method)
+       VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3)
        RETURNING order_id AS id`,
-      [employeeId, totalCents],
+      [employeeId, totalCents, PAYMENT_METHODS[paymentMethod]],
     );
 
     const insertLine = `INSERT INTO order_items

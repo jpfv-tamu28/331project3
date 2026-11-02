@@ -8,6 +8,7 @@ const ORDER_COLUMNS = [
   { key: 'createdAt', label: 'Date / Time' },
   { key: 'cashier', label: 'Cashier' },
   { key: 'status', label: 'Status', render: (o) => capitalize(o.status) },
+  { key: 'paymentMethod', label: 'Payment' },
   { key: 'totalCents', label: 'Total', type: 'cents' },
 ];
 
