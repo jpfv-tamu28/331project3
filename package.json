@@ -1,0 +1,14 @@
+{
+  "name": "boba-bops",
+  "private": true,
+  "description": "Boba Bops POS: run npm scripts from here to work on both the API and the React app.",
+  "scripts": {
+    "postinstall": "npm --prefix backend install && npm --prefix frontend install",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "build": "npm --prefix frontend run build",
+    "start": "node backend/src/server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

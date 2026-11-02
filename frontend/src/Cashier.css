@@ -1,0 +1,381 @@
+/* Three columns, like Cashier.java: nav | menu grid | current order. */
+.cashier {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 340px;
+  height: 100%;
+}
+
+/* ---------- Left nav ---------- */
+.cashier-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 12px;
+  background: var(--nav-bg);
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  padding: 0 10px 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.nav-item {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--subtle);
+  font-size: 13px;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--hover);
+}
+
+.nav-item.active {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---------- Menu ---------- */
+.cashier-menu {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 20px 24px 0;
+  background: var(--bg);
+}
+
+.menu-search {
+  min-height: 40px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 0 24px;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 104px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  text-align: left;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.menu-card:hover {
+  border-color: var(--line-strong);
+}
+
+.menu-card:active {
+  background: var(--hover);
+}
+
+.menu-card-name {
+  font-weight: 700;
+}
+
+.menu-card-category {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.menu-card-price {
+  margin-top: auto;
+  padding-top: 8px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---------- Order panel ---------- */
+.order-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+
+.order-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.order-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.order-header p {
+  margin-top: 3px;
+  font-size: 12px;
+}
+
+.order-lines {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px;
+}
+
+.order-lines ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order-empty {
+  padding-top: 40px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.order-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.order-line:last-child {
+  border-bottom: 0;
+}
+
+.order-line-main {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  font-size: 12px;
+}
+
+.order-line-main:hover {
+  background: var(--row-hover);
+}
+
+.order-line-main strong,
+.order-line-main span {
+  display: block;
+}
+
+.order-line-price {
+  padding: 0 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.totals {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+
+.totals div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--subtle);
+}
+
+.totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals .grand {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.payment {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.payment input {
+  width: 16px;
+  height: 16px;
+}
+
+.discount-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.discount-row label {
+  margin-right: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.discount-row .field {
+  width: 110px;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.discount-note {
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--success);
+  text-align: right;
+}
+
+.due-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+/* ---------- Customize dialog ---------- */
+.customize {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.customize fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.customize legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--subtle);
+}
+
+.extra-sweet {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.extra-sweet:hover {
+  background: var(--hover);
+}
+
+.extra-sweet.on {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.addons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.addons li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.addons li.chosen .addon-name {
+  font-weight: 700;
+}
+
+.addons .muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.line-total {
+  font-size: 15px;
+  color: var(--text);
+}
+
+/* ---------- Order history dialog ---------- */
+.history {
+  display: grid;
+  grid-template-rows: minmax(200px, 1.2fr) minmax(160px, 1fr);
+  height: min(60vh, 520px);
+  margin: 0 -22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.history section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.history .table-wrap {
+  flex: 1;
+}
+
+.history-items {
+  border-top: 1px solid var(--line);
+}
+
+/* Tablet landscape: narrower side columns. */
+@media (max-width: 1180px) {
+  .cashier {
+    grid-template-columns: 150px minmax(0, 1fr) 300px;
+  }
+
+  .discount-row .field {
+    width: 90px;
+  }
+}
