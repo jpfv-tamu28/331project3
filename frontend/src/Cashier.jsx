@@ -4,11 +4,11 @@ import { Modal } from './components/Modal';
 import { StateMessage } from './components/StateMessage';
 import { useResource } from './components/useResource';
 import { useToast } from './components/ToastProvider';
-import { money } from './format';
+import { money, percent } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import OrderHistoryDialog from './cashier/OrderHistoryDialog';
 import { customizationSummary, lineCents, orderTotals, toOrderRequest } from './cashier/order';
-import { PAYMENT_METHODS } from '../../shared/orderRules.js';
+import { PAYMENT_METHODS, TAX_RATE } from '../../shared/orderRules.js';
 import './Cashier.css';
 
 
@@ -212,7 +212,7 @@ export default function Cashier() {
         <div className="order-footer">
           <dl className="totals">
             <div><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div>
-            <div><dt>Taxes (8.25%)</dt><dd>{money(totals.tax)}</dd></div>
+            <div><dt>Taxes ({percent(TAX_RATE)})</dt><dd>{money(totals.tax)}</dd></div>
             <div><dt>Discounts</dt><dd>-{money(totals.discount)}</dd></div>
             <div className="grand"><dt>Total</dt><dd>{money(totals.total)}</dd></div>
           </dl>

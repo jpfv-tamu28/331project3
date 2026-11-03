@@ -1,5 +1,6 @@
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const quantityFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
+const percentFormat = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 3 });
 
 /** 1950 -> "$19.50" */
 export const money = (cents) => currency.format((cents ?? 0) / 100);
@@ -14,6 +15,8 @@ export function parsePriceCents(text) {
 }
 /** 152400 -> "152,400", 12.5 -> "12.5" */
 export const quantity = (n) => quantityFormat.format(n ?? 0);
+/** 0.0825 -> "8.25%" */
+export const percent = (rate) => percentFormat.format(rate ?? 0);
 
 export const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
 
