@@ -7,6 +7,7 @@
     "postinstall": "npm --prefix backend install && npm --prefix frontend install",
     "dev": "concurrently -k -n api,web -c yellow,cyan \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
     "build": "npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
     "start": "node backend/src/server.js"
   },
   "devDependencies": {

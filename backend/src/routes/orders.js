@@ -5,54 +5,15 @@ import {
   ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, SIZES, SUGAR_LEVELS, TAX_RATE,
 } from '../../../shared/orderRules.js';
 
-const router = Router();
-
 // Code -> fraction off the subtotal. Kept on the server so the browser can't invent discounts.
 const DISCOUNT_CODES = { ILOVEMYVETS: { rate: 0.1, label: 'Veteran discount: 10% off this order.' } };
 
-
-function lookupDiscount(code) {
+export function lookupDiscount(code) {
   if (typeof code !== 'string' || code.trim() === '') return null;
   return DISCOUNT_CODES[code.trim().toUpperCase()] ?? null;
 }
 
-// GET /api/orders/discounts/:code -> { code, rate, label } or 404
-router.get('/discounts/:code', (req, res) => {
-  const discount = lookupDiscount(req.params.code);
-  if (!discount) {
-    res.status(404).json({ error: `"${req.params.code}" is not a valid discount code.` });
-    return;
-  }
-  res.json({ code: req.params.code.trim().toUpperCase(), ...discount });
-});
-
-// GET /api/orders?limit=100 -> most recent orders first
-router.get('/', asyncRoute(async (req, res) => {
-  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
-  const { rows } = await pool.query(
-    `SELECT o.order_id AS id, to_char(o.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
-            COALESCE(e.name, 'Employee #' || o.employee_id, 'Unassigned') AS cashier,
-            o.status, o.payment_method AS "paymentMethod", o.total_cents AS "totalCents"
-     FROM orders o LEFT JOIN employees e ON o.employee_id = e.employee_id
-     ORDER BY o.created_at DESC, o.order_id DESC LIMIT $1`,
-    [limit],
-  );
-  res.json(rows);
-}));
-
-// GET /api/orders/:id/items -> lines of one order, toppings after the drink they belong to
-router.get('/:id/items', asyncRoute(async (req, res) => {
-  const id = requireId(req.params.id, 'Order ID');
-  const { rows } = await pool.query(
-    `SELECT order_item_id AS id, parent_order_item_id AS "parentId", item_name_snapshot AS name,
-            quantity, unit_price_cents AS "unitPriceCents"
-     FROM order_items WHERE order_id = $1 ORDER BY order_item_id`,
-    [id],
-  );
-  res.json(rows);
-}));
-
-function parseLines(items) {
+export function parseLines(items) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpError(400, 'Add at least one drink before finishing payment.');
   }
@@ -76,78 +37,131 @@ function parseLines(items) {
   });
 }
 
-// POST /api/orders { employeeId?, items: [{ menuItemId, size, ice, sugar, quantity, toppings: [{ menuItemId, count }] }],
-//                    discountCode?, paymentMethod }
-// Prices come from the database, not the request, so the total can't be tampered with.
-router.post('/', asyncRoute(async (req, res) => {
+export function parseOrderInput(body = {}) {
   // Views are opened without signing in, so an order may have no employee attached (stored as NULL).
-  const employeeId = req.body?.employeeId == null ? null : requireId(req.body.employeeId, 'Employee');
-  const lines = parseLines(req.body?.items);
-  const paymentKey = String(req.body?.paymentMethod ?? 'card').toLowerCase();
+  const employeeId = body?.employeeId == null ? null : requireId(body.employeeId, 'Employee');
+  const lines = parseLines(body?.items);
+  const paymentKey = String(body?.paymentMethod ?? 'card').toLowerCase();
   const paymentMethod = PAYMENT_METHODS.find((p) => p.value === paymentKey)?.label;
   if (!paymentMethod) {
     throw new HttpError(400, `Payment method must be one of: ${PAYMENT_METHODS.map((p) => p.value).join(', ')}.`);
   }
-  const discount = lookupDiscount(req.body?.discountCode);
-  if (req.body?.discountCode && !discount) {
-    throw new HttpError(400, `"${req.body.discountCode}" is not a valid discount code.`);
+  const discount = lookupDiscount(body?.discountCode);
+  if (body?.discountCode && !discount) {
+    throw new HttpError(400, `"${body.discountCode}" is not a valid discount code.`);
   }
+  return { employeeId, lines, paymentKey, paymentMethod, discount };
+}
 
-  const order = await withTransaction(async (client) => {
-    const ids = [...new Set(lines.flatMap((l) => [l.menuItemId, ...l.toppings.map((t) => t.menuItemId)]))];
-    const { rows: menuRows } = await client.query(
-      `SELECT menu_item_id AS id, name, item_type AS "itemType", price_cents AS "priceCents"
-       FROM menu_items WHERE menu_item_id = ANY($1::int[]) AND is_available`,
-      [ids],
-    );
-    const menu = new Map(menuRows.map((m) => [m.id, m]));
-    const find = (id, wantTopping) => {
-      const item = menu.get(id);
-      if (!item) throw new HttpError(409, `Menu item #${id} is no longer available.`);
-      if ((item.itemType === 'topping') !== wantTopping) {
-        throw new HttpError(400, `${item.name} can't be ordered ${wantTopping ? 'as an add-on' : 'on its own'}.`);
-      }
-      return item;
-    };
-
-    let subtotalCents = 0;
-    const priced = lines.map((line) => {
-      const drink = find(line.menuItemId, false);
-      const toppings = line.toppings.map((t) => ({ ...t, item: find(t.menuItemId, true) }));
-      const unit = drink.priceCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
-      subtotalCents += unit * line.quantity;
-      return { ...line, drink, toppings };
-    });
-    const taxCents = Math.round(subtotalCents * TAX_RATE);
-    const discountCents = Math.round(subtotalCents * (discount?.rate ?? 0));
-    const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
-
-    // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
-    await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
-    const { rows: [{ id: orderId }] } = await client.query(
-      `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method)
-       VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3)
-       RETURNING order_id AS id`,
-      [employeeId, totalCents, paymentMethod],
-    );
-
-    const insertLine = `INSERT INTO order_items
-      (order_id, menu_item_id, parent_order_item_id, item_name_snapshot, quantity, unit_price_cents)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING order_item_id AS id`;
-    for (const line of priced) {
-      const snapshot = `${line.drink.name} (${line.size}, ${line.ice} ice, ${line.sugar} sugar)`;
-      const { rows: [{ id: parentId }] } = await client.query(insertLine,
-        [orderId, line.drink.id, null, snapshot, line.quantity, line.drink.priceCents]);
-      // One row per add-on, repeats folded into quantity (2 scoops on 3 drinks = 6).
-      for (const t of line.toppings) {
-        await client.query(insertLine,
-          [orderId, t.item.id, parentId, t.item.name, t.count * line.quantity, t.item.priceCents]);
-      }
+export function priceOrder(lines, menuRows, discount = null) {
+  const menu = new Map(menuRows.map((m) => [m.id, m]));
+  const find = (id, wantTopping) => {
+    const item = menu.get(id);
+    if (!item) throw new HttpError(409, `Menu item #${id} is no longer available.`);
+    if ((item.itemType === 'topping') !== wantTopping) {
+      throw new HttpError(400, `${item.name} can't be ordered ${wantTopping ? 'as an add-on' : 'on its own'}.`);
     }
-    return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
+    return item;
+  };
+
+  let subtotalCents = 0;
+  const priced = lines.map((line) => {
+    const drink = find(line.menuItemId, false);
+    const toppings = line.toppings.map((t) => ({ ...t, item: find(t.menuItemId, true) }));
+    const unit = drink.priceCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
+    subtotalCents += unit * line.quantity;
+    return { ...line, drink, toppings };
+  });
+  const taxCents = Math.round(subtotalCents * TAX_RATE);
+  const discountCents = Math.round(subtotalCents * (discount?.rate ?? 0));
+  const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+
+  return { priced, subtotalCents, taxCents, discountCents, totalCents };
+}
+
+export function createOrderRoutes({ db = pool, runTransaction = withTransaction } = {}) {
+  const router = Router();
+
+  // GET /api/orders/discounts/:code -> { code, rate, label } or 404
+  router.get('/discounts/:code', (req, res) => {
+    const discount = lookupDiscount(req.params.code);
+    if (!discount) {
+      res.status(404).json({ error: `"${req.params.code}" is not a valid discount code.` });
+      return;
+    }
+    res.json({ code: req.params.code.trim().toUpperCase(), ...discount });
   });
 
-  res.status(201).json(order);
-}));
+  // GET /api/orders?limit=100 -> most recent orders first
+  router.get('/', asyncRoute(async (req, res) => {
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
+    const { rows } = await db.query(
+      `SELECT o.order_id AS id, to_char(o.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
+              COALESCE(e.name, 'Employee #' || o.employee_id, 'Unassigned') AS cashier,
+              o.status, o.payment_method AS "paymentMethod", o.total_cents AS "totalCents"
+       FROM orders o LEFT JOIN employees e ON o.employee_id = e.employee_id
+       ORDER BY o.created_at DESC, o.order_id DESC LIMIT $1`,
+      [limit],
+    );
+    res.json(rows);
+  }));
 
-export default router;
+  // GET /api/orders/:id/items -> lines of one order, toppings after the drink they belong to
+  router.get('/:id/items', asyncRoute(async (req, res) => {
+    const id = requireId(req.params.id, 'Order ID');
+    const { rows } = await db.query(
+      `SELECT order_item_id AS id, parent_order_item_id AS "parentId", item_name_snapshot AS name,
+              quantity, unit_price_cents AS "unitPriceCents"
+       FROM order_items WHERE order_id = $1 ORDER BY order_item_id`,
+      [id],
+    );
+    res.json(rows);
+  }));
+
+  // POST /api/orders { employeeId?, items: [{ menuItemId, size, ice, sugar, quantity, toppings: [{ menuItemId, count }] }],
+  //                    discountCode?, paymentMethod }
+  // Prices come from the database, not the request, so the total can't be tampered with.
+  router.post('/', asyncRoute(async (req, res) => {
+    const { employeeId, lines, paymentKey, paymentMethod, discount } = parseOrderInput(req.body);
+
+    const order = await runTransaction(async (client) => {
+      const ids = [...new Set(lines.flatMap((l) => [l.menuItemId, ...l.toppings.map((t) => t.menuItemId)]))];
+      const { rows: menuRows } = await client.query(
+        `SELECT menu_item_id AS id, name, item_type AS "itemType", price_cents AS "priceCents"
+         FROM menu_items WHERE menu_item_id = ANY($1::int[]) AND is_available`,
+        [ids],
+      );
+      const { priced, subtotalCents, taxCents, discountCents, totalCents } = priceOrder(lines, menuRows, discount);
+
+      // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
+      await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
+      const { rows: [{ id: orderId }] } = await client.query(
+        `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method)
+         VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3)
+         RETURNING order_id AS id`,
+        [employeeId, totalCents, paymentMethod],
+      );
+
+      const insertLine = `INSERT INTO order_items
+        (order_id, menu_item_id, parent_order_item_id, item_name_snapshot, quantity, unit_price_cents)
+        VALUES ($1, $2, $3, $4, $5, $6) RETURNING order_item_id AS id`;
+      for (const line of priced) {
+        const snapshot = `${line.drink.name} (${line.size}, ${line.ice} ice, ${line.sugar} sugar)`;
+        const { rows: [{ id: parentId }] } = await client.query(insertLine,
+          [orderId, line.drink.id, null, snapshot, line.quantity, line.drink.priceCents]);
+        // One row per add-on, repeats folded into quantity (2 scoops on 3 drinks = 6).
+        for (const t of line.toppings) {
+          await client.query(insertLine,
+            [orderId, t.item.id, parentId, t.item.name, t.count * line.quantity, t.item.priceCents]);
+        }
+      }
+      return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
+    });
+
+    res.status(201).json(order);
+  }));
+
+  return router;
+}
+
+export default createOrderRoutes();
