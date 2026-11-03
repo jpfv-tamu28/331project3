@@ -2,16 +2,11 @@ import { useEffect, useRef } from 'react';
 import { Segmented } from '../components/Segmented';
 import { Stepper } from '../components/Stepper';
 import { money } from '../format';
-import { MAX_QUANTITY, customizationSummary, lineCents } from '../cashier/order';
+import { MAX_QUANTITY, PAYMENT_METHODS, SIZES } from '../../../shared/orderRules.js';
+import { customizationSummary, lineCents } from '../cashier/order';
 import DrinkArt from './DrinkArt';
 
-export const PAYMENT_METHODS = [
-  { value: 'card', label: 'Card' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'giftcard', label: 'Gift Card' },
-];
-
-const SIZE_NAMES = { S: 'Small', M: 'Medium', L: 'Large' };
+const SIZE_NAMES = Object.fromEntries(SIZES.map((s) => [s.value, s.label]));
 
 /**
  * Slide-out order panel on the left, opened and closed with the cart button.

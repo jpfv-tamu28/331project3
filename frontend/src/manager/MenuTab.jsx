@@ -6,9 +6,9 @@ import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
 import { capitalize, money } from '../format';
+import { ITEM_TYPES } from '../../../shared/orderRules.js';
 import SeasonalItemDialog from './SeasonalItemDialog';
 
-export const ITEM_TYPES = ['drink', 'topping'];
 const isTopping = (m) => m.itemType?.toLowerCase() === 'topping';
 
 const FILTERS = [

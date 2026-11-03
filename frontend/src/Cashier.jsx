@@ -8,13 +8,9 @@ import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import OrderHistoryDialog from './cashier/OrderHistoryDialog';
 import { customizationSummary, lineCents, orderTotals, toOrderRequest } from './cashier/order';
+import { PAYMENT_METHODS } from '../../shared/orderRules.js';
 import './Cashier.css';
 
-const PAYMENT_METHODS = [
-  { value: 'card', label: 'Card' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'giftcard', label: 'Gift Card' },
-];
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
 

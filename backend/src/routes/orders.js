@@ -1,20 +1,15 @@
 import { Router } from 'express';
 import { pool, withTransaction } from '../db.js';
 import { asyncRoute, HttpError, requireId } from '../http.js';
+import {
+  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, SIZES, SUGAR_LEVELS, TAX_RATE,
+} from '../../../shared/orderRules.js';
 
 const router = Router();
 
-export const TAX_RATE = 0.0825;
 // Code -> fraction off the subtotal. Kept on the server so the browser can't invent discounts.
 const DISCOUNT_CODES = { ILOVEMYVETS: { rate: 0.1, label: 'Veteran discount: 10% off this order.' } };
 
-const SIZES = ['S', 'M', 'L'];
-const ICE_LEVELS = ['0%', '50%', '100%'];
-const SUGAR_LEVELS = ['0%', '50%', '100%', '200%'];
-const MAX_TOPPING_COUNT = 5;
-const MAX_QUANTITY = 99;
-// API value -> the value orders.payment_method accepts (its CHECK constraint allows exactly these three).
-const PAYMENT_METHODS = { card: 'Card', cash: 'Cash', giftcard: 'Gift Card' };
 
 function lookupDiscount(code) {
   if (typeof code !== 'string' || code.trim() === '') return null;
@@ -67,7 +62,7 @@ function parseLines(items) {
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
       throw new HttpError(400, `Quantity must be between 1 and ${MAX_QUANTITY}.`);
     }
-    if (!SIZES.includes(line.size)) throw new HttpError(400, 'Size must be S, M or L.');
+    if (!SIZES.some((sz) => sz.value === line.size)) throw new HttpError(400, 'Size must be S, M or L.');
     if (!ICE_LEVELS.includes(line.ice)) throw new HttpError(400, 'Invalid ice level.');
     if (!SUGAR_LEVELS.includes(line.sugar)) throw new HttpError(400, 'Invalid sugar level.');
     const toppings = (Array.isArray(line.toppings) ? line.toppings : []).map((t) => {
@@ -88,9 +83,10 @@ router.post('/', asyncRoute(async (req, res) => {
   // Views are opened without signing in, so an order may have no employee attached (stored as NULL).
   const employeeId = req.body?.employeeId == null ? null : requireId(req.body.employeeId, 'Employee');
   const lines = parseLines(req.body?.items);
-  const paymentMethod = String(req.body?.paymentMethod ?? 'card').toLowerCase();
-  if (!(paymentMethod in PAYMENT_METHODS)) {
-    throw new HttpError(400, `Payment method must be one of: ${Object.keys(PAYMENT_METHODS).join(', ')}.`);
+  const paymentKey = String(req.body?.paymentMethod ?? 'card').toLowerCase();
+  const paymentMethod = PAYMENT_METHODS.find((p) => p.value === paymentKey)?.label;
+  if (!paymentMethod) {
+    throw new HttpError(400, `Payment method must be one of: ${PAYMENT_METHODS.map((p) => p.value).join(', ')}.`);
   }
   const discount = lookupDiscount(req.body?.discountCode);
   if (req.body?.discountCode && !discount) {
@@ -132,7 +128,7 @@ router.post('/', asyncRoute(async (req, res) => {
       `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method)
        VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3)
        RETURNING order_id AS id`,
-      [employeeId, totalCents, PAYMENT_METHODS[paymentMethod]],
+      [employeeId, totalCents, paymentMethod],
     );
 
     const insertLine = `INSERT INTO order_items
@@ -148,7 +144,7 @@ router.post('/', asyncRoute(async (req, res) => {
           [orderId, t.item.id, parentId, t.item.name, t.count * line.quantity, t.item.priceCents]);
       }
     }
-    return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod };
+    return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
   });
 
   res.status(201).json(order);

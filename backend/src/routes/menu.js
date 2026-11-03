@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { pool, withTransaction } from '../db.js';
 import { asyncRoute, HttpError, requireCents, requireId, requireText } from '../http.js';
+import { ITEM_TYPES } from '../../../shared/orderRules.js';
 
 const router = Router();
 
-export const ITEM_TYPES = ['drink', 'topping'];
 const SEASONAL_CATEGORY = 'Seasonal';
 
 const SELECT_MENU = `

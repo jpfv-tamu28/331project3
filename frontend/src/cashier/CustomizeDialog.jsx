@@ -4,8 +4,9 @@ import { Segmented } from '../components/Segmented';
 import { Stepper } from '../components/Stepper';
 import { money } from '../format';
 import {
-  EXTRA_SWEET, LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES, lineCents,
-} from './order';
+  EXTRA_SWEET, LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES,
+} from '../../../shared/orderRules.js';
+import { lineCents } from './order';
 
 /**
  * Size / ice / sugar / add-ons / quantity for one drink (Cashier.openCustomizationDialog).

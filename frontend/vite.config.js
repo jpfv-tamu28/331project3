@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // Lets the dev server serve ../shared, which the API imports too.
+    fs: { allow: ['..'] },
     proxy: {
       '/api': process.env.VITE_API_PROXY || 'http://localhost:3001',
     },

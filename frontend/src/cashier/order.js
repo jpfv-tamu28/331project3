@@ -1,16 +1,6 @@
-// Order-line helpers for the cashier screen (Cashier.OrderItem in the Java app).
+// Order-line helpers for the cashier and kiosk screens.
 // All money is in cents; the server re-prices every order from the database, using the same math.
-
-export const TAX_RATE = 0.0825;
-export const SIZES = [
-  { value: 'S', label: 'Small' },
-  { value: 'M', label: 'Medium' },
-  { value: 'L', label: 'Large' },
-];
-export const LEVELS = ['0%', '50%', '100%'];
-export const EXTRA_SWEET = '200%';
-export const MAX_TOPPING_COUNT = 5;
-export const MAX_QUANTITY = 99;
+import { TAX_RATE } from '../../../shared/orderRules.js';
 
 /** Price of one drink with its add-ons, before quantity. */
 export function unitCents(line) {
