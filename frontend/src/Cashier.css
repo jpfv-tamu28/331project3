@@ -329,6 +329,15 @@
   font-weight: 700;
 }
 
+.customize-desc {
+  margin-top: 4px;
+  color: var(--subtle);
+}
+
+.addon-desc {
+  display: none;
+}
+
 .addons .muted {
   font-size: 12px;
   font-weight: 400;

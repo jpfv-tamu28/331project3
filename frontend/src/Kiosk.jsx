@@ -8,7 +8,8 @@ import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
 import CartPanel from './kiosk/CartPanel';
-import DrinkArt, { flavorColor, tint } from './kiosk/DrinkArt';
+import DrinkArt from './kiosk/DrinkArt';
+import { flavorColor, tint } from './kiosk/drinkColors';
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
@@ -232,6 +233,7 @@ export default function Kiosk() {
                       >
                         <span className="kiosk-tile-art"><DrinkArt item={item} /></span>
                         <span className="kiosk-tile-name">{item.name}</span>
+                        {item.description && <span className="kiosk-tile-desc">{item.description}</span>}
                         <span className="kiosk-tile-price">{money(item.priceCents)}</span>
                       </button>
                     </li>

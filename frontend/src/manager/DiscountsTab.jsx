@@ -5,8 +5,7 @@ import { Modal } from '../components/Modal';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { money } from '../format';
-import { parsePriceCents } from './MenuTab';
+import { money, parsePriceCents } from '../format';
 
 const TYPES = [
   { value: 'PERCENT', label: 'Percent off' },
