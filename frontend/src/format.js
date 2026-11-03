@@ -5,6 +5,13 @@ const quantityFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3
 export const money = (cents) => currency.format((cents ?? 0) / 100);
 /** 19.5 -> "$19.50" */
 export const dollars = (value) => currency.format(value ?? 0);
+/** "5.25" -> 525, or null if it isn't a valid non-negative amount with at most 2 decimals. */
+export function parsePriceCents(text) {
+  const trimmed = String(text).trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
+  const [whole, frac = ''] = trimmed.split('.');
+  return Number(whole) * 100 + Number(frac.padEnd(2, '0'));
+}
 /** 152400 -> "152,400", 12.5 -> "12.5" */
 export const quantity = (n) => quantityFormat.format(n ?? 0);
 

@@ -8,7 +8,8 @@ import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
 import CartPanel from './kiosk/CartPanel';
-import DrinkArt, { flavorColor, tint } from './kiosk/DrinkArt';
+import DrinkArt from './kiosk/DrinkArt';
+import { flavorColor, tint } from './kiosk/drinkColors';
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';

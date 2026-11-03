@@ -1,8 +1,7 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { ChipBar } from '../components/ChipBar';
 import { daysAgo, isoDate } from '../format';
-
-export const DEFAULT_RANGE_DAYS = 30;
+import { DEFAULT_RANGE_DAYS } from './useDateRange';
 
 const PRESETS = {
   'Last 30 days': () => daysAgo(DEFAULT_RANGE_DAYS),
@@ -16,11 +15,6 @@ const PRESETS = {
   },
   'This year': () => new Date(new Date().getFullYear(), 0, 1),
 };
-
-/** Range state for a report: { from, to, preset } as YYYY-MM-DD strings. */
-export function useDateRange() {
-  return useState({ from: isoDate(daysAgo(DEFAULT_RANGE_DAYS)), to: isoDate(), preset: 'Last 30 days' });
-}
 
 /**
  * Second toolbar row for range reports (DatePicker.rangeToolbar): quick ranges, the two dates, and the run button.
