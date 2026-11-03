@@ -4,10 +4,13 @@ import express from 'express';
 import { HttpError } from '../src/http.js';
 import {
   createOrderRoutes,
+  discountAmount,
+  discountLabel,
   lookupDiscount,
   parseLines,
   parseOrderInput,
   priceOrder,
+  redeemDiscount,
 } from '../src/routes/orders.js';
 import { MAX_QUANTITY, MAX_TOPPING_COUNT } from '../../shared/orderRules.js';
 
@@ -17,6 +20,15 @@ const SAMPLE_MENU = [
   { id: 10, name: 'Tapioca Pearls (Boba)', itemType: 'topping', priceCents: 75 },
   { id: 11, name: 'Lychee Jelly', itemType: 'topping', priceCents: 80 },
 ];
+
+const VET_DISCOUNT = {
+  id: 7,
+  code: 'ILOVEMYVETS',
+  description: 'Veteran discount: 10% off this order.',
+  type: 'PERCENT',
+  value: 10,
+  minOrderCents: 0,
+};
 
 const validLine = (overrides = {}) => ({
   menuItemId: 1,
@@ -37,22 +49,76 @@ function expectHttpError(fn, status, messagePattern) {
   });
 }
 
-describe('lookupDiscount', () => {
-  it('matches known codes case-insensitively and trims whitespace', () => {
-    assert.deepEqual(lookupDiscount('ILOVEMYVETS'), {
-      rate: 0.1,
-      label: 'Veteran discount: 10% off this order.',
-    });
-    assert.equal(lookupDiscount('  ilovemyvets ')?.rate, 0.1);
+async function expectAsyncHttpError(fn, status, messagePattern) {
+  await assert.rejects(fn, (err) => {
+    assert.ok(err instanceof HttpError, `Expected HttpError, got ${err}`);
+    assert.equal(err.status, status);
+    if (messagePattern) assert.match(err.message, messagePattern);
+    return true;
+  });
+}
+
+describe('discounts helpers', () => {
+  it('lookupDiscount normalizes code before querying and skips blank input', async () => {
+    const seenParams = [];
+    const fakeDb = {
+      async query(_sql, params) {
+        seenParams.push(params);
+        return { rows: params[0] === 'ILOVEMYVETS' ? [VET_DISCOUNT] : [] };
+      },
+    };
+
+    assert.equal(await lookupDiscount(fakeDb, undefined), null);
+    assert.equal(await lookupDiscount(fakeDb, ''), null);
+    assert.equal(await lookupDiscount(fakeDb, '   '), null);
+    assert.equal(await lookupDiscount(fakeDb, 123), null);
+    assert.equal(seenParams.length, 0);
+
+    const found = await lookupDiscount(fakeDb, '  ilovemyvets ');
+    assert.deepEqual(found, VET_DISCOUNT);
+    assert.deepEqual(seenParams, [['ILOVEMYVETS']]);
+    assert.equal(await lookupDiscount(fakeDb, 'BOGUS50'), null);
   });
 
-  it('returns null for blank, non-string, or unknown codes', () => {
-    assert.equal(lookupDiscount(undefined), null);
-    assert.equal(lookupDiscount(null), null);
-    assert.equal(lookupDiscount(''), null);
-    assert.equal(lookupDiscount('   '), null);
-    assert.equal(lookupDiscount(123), null);
-    assert.equal(lookupDiscount('BOGUS50'), null);
+  it('discountAmount handles PERCENT and FIXED discounts and caps at subtotal', () => {
+    assert.equal(discountAmount(null, 1000), 0);
+    assert.equal(discountAmount({ type: 'PERCENT', value: 10 }, 2135), 214);
+    assert.equal(discountAmount({ type: 'FIXED', value: 300 }, 1000), 300);
+    assert.equal(discountAmount({ type: 'FIXED', value: 2500 }, 1000), 1000);
+  });
+
+  it('discountLabel prefers explicit description and falls back to type summary', () => {
+    assert.equal(discountLabel(VET_DISCOUNT), 'Veteran discount: 10% off this order.');
+    assert.equal(discountLabel({ description: null, type: 'PERCENT', value: 15 }), '15% off this order.');
+    assert.equal(discountLabel({ description: null, type: 'FIXED', value: 250 }), '$2.50 off this order.');
+  });
+
+  it('redeemDiscount enforces validity, minimum order, and usage limits', async () => {
+    let updateRowCount = 1;
+    const fakeClient = {
+      async query(sql, params) {
+        if (sql.includes('FROM discount_codes')) {
+          return {
+            rows: params[0] === 'MIN10'
+              ? [{ ...VET_DISCOUNT, code: 'MIN10', minOrderCents: 1000 }]
+              : [],
+          };
+        }
+        if (sql.startsWith('UPDATE discount_codes')) {
+          return { rowCount: updateRowCount };
+        }
+        throw new Error(`Unexpected SQL: ${sql}`);
+      },
+    };
+
+    await expectAsyncHttpError(() => redeemDiscount(fakeClient, 'NOPE', 1500), 400, /not a valid discount code/);
+    await expectAsyncHttpError(() => redeemDiscount(fakeClient, 'MIN10', 800), 400, /at least \$10\.00/);
+
+    const redeemed = await redeemDiscount(fakeClient, 'min10', 1200);
+    assert.equal(redeemed.code, 'MIN10');
+
+    updateRowCount = 0;
+    await expectAsyncHttpError(() => redeemDiscount(fakeClient, 'MIN10', 1200), 409, /reached its usage limit/);
   });
 });
 
@@ -151,10 +217,10 @@ describe('parseOrderInput', () => {
     assert.equal(parsed.employeeId, null);
     assert.equal(parsed.paymentKey, 'card');
     assert.equal(parsed.paymentMethod, 'Card');
-    assert.equal(parsed.discount, null);
+    assert.equal(parsed.discountCode, null);
   });
 
-  it('normalizes payment methods and validates employeeId and discountCode', () => {
+  it('normalizes payment methods and validates employeeId', () => {
     const parsed = parseOrderInput({
       employeeId: '3',
       paymentMethod: 'GIFTCARD',
@@ -164,7 +230,7 @@ describe('parseOrderInput', () => {
     assert.equal(parsed.employeeId, 3);
     assert.equal(parsed.paymentKey, 'giftcard');
     assert.equal(parsed.paymentMethod, 'Gift Card');
-    assert.equal(parsed.discount?.rate, 0.1);
+    assert.equal(parsed.discountCode, 'ilovemyvets');
 
     expectHttpError(
       () => parseOrderInput({ employeeId: 0, items: [validLine()] }),
@@ -175,11 +241,6 @@ describe('parseOrderInput', () => {
       () => parseOrderInput({ paymentMethod: 'venmo', items: [validLine()] }),
       400,
       /Payment method must be one of/,
-    );
-    expectHttpError(
-      () => parseOrderInput({ discountCode: 'NOPE', items: [validLine()] }),
-      400,
-      /not a valid discount code/,
     );
   });
 });
@@ -211,8 +272,7 @@ describe('priceOrder', () => {
       validLine({ menuItemId: 1, quantity: 1 }),
     ]);
 
-    const discount = lookupDiscount('ILOVEMYVETS');
-    const result = priceOrder(lines, SAMPLE_MENU, discount);
+    const result = priceOrder(lines, SAMPLE_MENU, VET_DISCOUNT);
 
     // subtotal = 2135; tax = round(2135 * 0.0825 = 176.1375) = 176; discount = round(213.5) = 214
     assert.equal(result.subtotalCents, 2135);
@@ -227,10 +287,11 @@ describe('priceOrder', () => {
     assert.equal(result.subtotalCents, 575);
   });
 
-  it('clamps totalCents at zero if a discount exceeds subtotal plus tax', () => {
+  it('caps fixed discounts at subtotal so tax still applies cleanly', () => {
     const lines = parseLines([validLine({ menuItemId: 1 })]);
-    const result = priceOrder(lines, SAMPLE_MENU, { rate: 2 });
-    assert.equal(result.totalCents, 0);
+    const result = priceOrder(lines, SAMPLE_MENU, { type: 'FIXED', value: 9999 });
+    assert.equal(result.discountCents, 525);
+    assert.equal(result.totalCents, 43);
   });
 
   it('throws 409 when a drink or add-on is missing or unavailable', () => {
@@ -268,11 +329,17 @@ describe('orders HTTP routes', () => {
     availableMenu = SAMPLE_MENU;
     recordedInserts = [];
 
-    const fakeClient = {
+    const fakeDb = {
       async query(sql, params = []) {
         if (sql.includes('FROM menu_items')) {
           const ids = params[0];
           return { rows: availableMenu.filter((m) => ids.includes(m.id)) };
+        }
+        if (sql.includes('FROM discount_codes')) {
+          return { rows: params[0] === 'ILOVEMYVETS' ? [VET_DISCOUNT] : [] };
+        }
+        if (sql.startsWith('UPDATE discount_codes')) {
+          return { rowCount: 1 };
         }
         if (sql.startsWith('LOCK TABLE')) {
           return { rows: [] };
@@ -293,7 +360,8 @@ describe('orders HTTP routes', () => {
     const app = express();
     app.use(express.json());
     app.use('/api/orders', createOrderRoutes({
-      runTransaction: (fn) => fn(fakeClient),
+      db: fakeDb,
+      runTransaction: (fn) => fn(fakeDb),
     }));
     // Match server.js error handling for HttpError responses.
     // eslint-disable-next-line no-unused-vars
@@ -318,7 +386,10 @@ describe('orders HTTP routes', () => {
     assert.equal(ok.status, 200);
     assert.deepEqual(await ok.json(), {
       code: 'ILOVEMYVETS',
+      type: 'PERCENT',
+      value: 10,
       rate: 0.1,
+      minOrderCents: 0,
       label: 'Veteran discount: 10% off this order.',
     });
 
@@ -361,7 +432,7 @@ describe('orders HTTP routes', () => {
     });
 
     assert.deepEqual(recordedInserts, [
-      { table: 'orders', params: [1, 2136, 'Cash'] },
+      { table: 'orders', params: [1, 2136, 'Cash', 7, 218] },
       {
         table: 'order_items',
         params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 200% sugar)', 3, 575],
@@ -374,16 +445,23 @@ describe('orders HTTP routes', () => {
     ]);
   });
 
-  it('returns 400 and writes nothing when validation fails', async () => {
+  it('returns 400 and writes nothing when validation or discount redemption fails', async () => {
     recordedInserts = [];
-    const res = await fetch(`${baseUrl}/api/orders`, {
+    const empty = await fetch(`${baseUrl}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: [] }),
     });
+    assert.equal(empty.status, 400);
+    assert.match((await empty.json()).error, /at least one drink/i);
 
-    assert.equal(res.status, 400);
-    assert.match((await res.json()).error, /at least one drink/i);
+    const badDiscount = await fetch(`${baseUrl}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discountCode: 'INVALID', items: [validLine()] }),
+    });
+    assert.equal(badDiscount.status, 400);
+    assert.match((await badDiscount.json()).error, /not a valid discount code/);
     assert.equal(recordedInserts.length, 0);
   });
 
