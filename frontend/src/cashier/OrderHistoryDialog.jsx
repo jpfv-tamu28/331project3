@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Api } from '../api';
-import { DataTable, Modal, SectionBar, StateMessage, useResource } from '../components/ui';
+import { DataTable } from '../components/DataTable';
+import { Modal } from '../components/Modal';
+import { SectionBar } from '../components/SectionBar';
+import { StateMessage } from '../components/StateMessage';
+import { useResource } from '../components/useResource';
 import { capitalize, money } from '../format';
 
 const ORDER_COLUMNS = [

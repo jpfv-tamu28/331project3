@@ -2,7 +2,7 @@
 
 Boba Bops point-of-sale web app: a React frontend and a Node/Express API over the
 team's PostgreSQL database on the TAMU server. The Cashier and Manager screens are
-ports of the Project 2 Java Swing app (`src/*.java`).
+ports of the Project 2 Java Swing app.
 
 Website link: https://three31project3-7gku.onrender.com
 

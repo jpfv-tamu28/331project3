@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ChipBar } from '../components/ui';
+import { ChipBar } from '../components/ChipBar';
 import { daysAgo, isoDate } from '../format';
 
 export const DEFAULT_RANGE_DAYS = 30;

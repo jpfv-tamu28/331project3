@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Segmented, Stepper } from '../components/ui';
+import { Segmented } from '../components/Segmented';
+import { Stepper } from '../components/Stepper';
 import { money } from '../format';
 import { MAX_QUANTITY, customizationSummary, lineCents } from '../cashier/order';
 import DrinkArt from './DrinkArt';

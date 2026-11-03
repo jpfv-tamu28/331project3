@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Api, errorMessage } from '../api';
-import { Modal, Segmented, StateMessage, useResource, useToast } from '../components/ui';
+import { Modal } from '../components/Modal';
+import { Segmented } from '../components/Segmented';
+import { StateMessage } from '../components/StateMessage';
+import { useResource } from '../components/useResource';
+import { useToast } from '../components/ToastProvider';
 import { capitalize, quantity } from '../format';
 import { ITEM_TYPES, parsePriceCents } from './MenuTab';
 

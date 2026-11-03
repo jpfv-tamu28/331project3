@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Modal, Segmented, Stepper } from '../components/ui';
+import { Modal } from '../components/Modal';
+import { Segmented } from '../components/Segmented';
+import { Stepper } from '../components/Stepper';
 import { money } from '../format';
 import {
   EXTRA_SWEET, LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES, lineCents,
