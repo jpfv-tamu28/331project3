@@ -7,24 +7,67 @@ import {
 
 const router = Router();
 
-// Code -> fraction off the subtotal. Kept on the server so the browser can't invent discounts.
-const DISCOUNT_CODES = { ILOVEMYVETS: { rate: 0.1, label: 'Veteran discount: 10% off this order.' } };
-
-
-function lookupDiscount(code) {
-  if (typeof code !== 'string' || code.trim() === '') return null;
-  return DISCOUNT_CODES[code.trim().toUpperCase()] ?? null;
+// Active, in-window, not-exhausted code -> discount row, or null. `db` is the pool or a transaction client.
+async function lookupDiscount(db, rawCode) {
+  if (typeof rawCode !== 'string' || rawCode.trim() === '') return null;
+  const { rows: [row] } = await db.query(
+    `SELECT discount_code_id AS id, code, description, discount_type AS type,
+            discount_value AS value, min_order_cents AS "minOrderCents"
+     FROM discount_codes
+     WHERE UPPER(code) = $1
+       AND is_active
+       AND (starts_at IS NULL OR starts_at <= LOCALTIMESTAMP)
+       AND (expires_at IS NULL OR expires_at > LOCALTIMESTAMP)
+       AND (max_uses IS NULL OR times_used < max_uses)`,
+    [rawCode.trim().toUpperCase()],
+  );
+  return row ?? null;
 }
 
-// GET /api/orders/discounts/:code -> { code, rate, label } or 404
-router.get('/discounts/:code', (req, res) => {
-  const discount = lookupDiscount(req.params.code);
+const discountLabel = (d) => d.description
+  ?? (d.type === 'PERCENT' ? `${d.value}% off this order.` : `$${(d.value / 100).toFixed(2)} off this order.`);
+
+// Validates a code against this order and claims one use. Call inside the order transaction.
+async function redeemDiscount(client, rawCode, subtotalCents) {
+  const discount = await lookupDiscount(client, rawCode);
+  if (!discount) throw new HttpError(400, `"${rawCode}" is not a valid discount code.`);
+  if (subtotalCents < discount.minOrderCents) {
+    throw new HttpError(400, `${discount.code} needs an order of at least $${(discount.minOrderCents / 100).toFixed(2)}.`);
+  }
+  // Guarded UPDATE so two concurrent orders can't both take the last use.
+  const { rowCount } = await client.query(
+    `UPDATE discount_codes SET times_used = times_used + 1
+     WHERE discount_code_id = $1 AND (max_uses IS NULL OR times_used < max_uses)`,
+    [discount.id],
+  );
+  if (rowCount === 0) throw new HttpError(409, `${discount.code} has reached its usage limit.`);
+  return discount;
+}
+
+function discountAmount(discount, subtotalCents) {
+  if (!discount) return 0;
+  const raw = discount.type === 'PERCENT'
+    ? Math.round((subtotalCents * discount.value) / 100)
+    : discount.value;
+  return Math.min(raw, subtotalCents); // never discount more than the subtotal
+}
+
+// GET /api/orders/discounts/:code -> { code, type, value, rate, minOrderCents, label } or 404
+router.get('/discounts/:code', asyncRoute(async (req, res) => {
+  const discount = await lookupDiscount(pool, req.params.code);
   if (!discount) {
     res.status(404).json({ error: `"${req.params.code}" is not a valid discount code.` });
     return;
   }
-  res.json({ code: req.params.code.trim().toUpperCase(), ...discount });
-});
+  res.json({
+    code: discount.code,
+    type: discount.type,
+    value: discount.value,
+    rate: discount.type === 'PERCENT' ? discount.value / 100 : null, // same field the old endpoint returned
+    minOrderCents: discount.minOrderCents,
+    label: discountLabel(discount),
+  });
+}));
 
 // GET /api/orders?limit=100 -> most recent orders first
 router.get('/', asyncRoute(async (req, res) => {
@@ -88,10 +131,6 @@ router.post('/', asyncRoute(async (req, res) => {
   if (!paymentMethod) {
     throw new HttpError(400, `Payment method must be one of: ${PAYMENT_METHODS.map((p) => p.value).join(', ')}.`);
   }
-  const discount = lookupDiscount(req.body?.discountCode);
-  if (req.body?.discountCode && !discount) {
-    throw new HttpError(400, `"${req.body.discountCode}" is not a valid discount code.`);
-  }
 
   const order = await withTransaction(async (client) => {
     const ids = [...new Set(lines.flatMap((l) => [l.menuItemId, ...l.toppings.map((t) => t.menuItemId)]))];
@@ -119,16 +158,21 @@ router.post('/', asyncRoute(async (req, res) => {
       return { ...line, drink, toppings };
     });
     const taxCents = Math.round(subtotalCents * TAX_RATE);
-    const discountCents = Math.round(subtotalCents * (discount?.rate ?? 0));
+    const rawCode = req.body?.discountCode;
+    const discount = typeof rawCode === 'string' && rawCode.trim() !== ''
+      ? await redeemDiscount(client, rawCode, subtotalCents)
+      : null;
+    const discountCents = discountAmount(discount, subtotalCents);
     const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
 
     // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
     await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
     const { rows: [{ id: orderId }] } = await client.query(
-      `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method)
-       VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3)
+      `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method,
+                           discount_code_id, discount_cents)
+       VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3, $4, $5)
        RETURNING order_id AS id`,
-      [employeeId, totalCents, paymentMethod],
+      [employeeId, totalCents, paymentMethod, discount?.id ?? null, discountCents],
     );
 
     const insertLine = `INSERT INTO order_items

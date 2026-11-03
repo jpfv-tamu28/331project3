@@ -79,3 +79,23 @@ INSERT INTO employees (employee_id, name, role, is_active, pin) VALUES
 -- Sync SERIAL sequences with the explicit ids loaded above
 SELECT setval('inventory_inventory_id_seq', (SELECT MAX(inventory_id) FROM inventory));
 SELECT setval('order_items_order_item_id_seq', (SELECT MAX(order_item_id) FROM order_items));
+
+-- add to the drop section (anywhere; CASCADE handles the FK from orders)
+DROP TABLE IF EXISTS discount_codes CASCADE;
+
+-- create BEFORE orders, since orders will reference it
+CREATE TABLE discount_codes (
+    discount_code_id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT,
+    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENT', 'FIXED')),
+    discount_value INT NOT NULL CHECK (discount_value > 0),   -- percent (1-100) or cents
+    min_order_cents INT NOT NULL DEFAULT 0,
+    max_uses INT,                                             -- NULL = unlimited
+    times_used INT NOT NULL DEFAULT 0,
+    starts_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CHECK (discount_type <> 'PERCENT' OR discount_value <= 100),
+    CHECK (expires_at IS NULL OR starts_at IS NULL OR expires_at > starts_at)
+);
