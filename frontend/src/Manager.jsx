@@ -5,6 +5,7 @@ import EmployeesTab from './manager/EmployeesTab';
 import ReportsTab from './manager/ReportsTab';
 import XReportTab from './manager/XReportTab';
 import ProductUsageTab from './manager/ProductUsageTab';
+import DiscountsTab from './manager/DiscountsTab';
 import './Manager.css';
 
 const PAGES = [
@@ -14,6 +15,7 @@ const PAGES = [
   { key: 'reports', label: 'Reports', Component: ReportsTab },
   { key: 'x-report', label: 'X-Report', Component: XReportTab },
   { key: 'usage', label: 'Product Usage', Component: ProductUsageTab },
+  { key: 'discounts', label: 'Discounts', Component: DiscountsTab },
 ];
 
 export default function Manager() {

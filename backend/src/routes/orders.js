@@ -69,6 +69,74 @@ router.get('/discounts/:code', asyncRoute(async (req, res) => {
   });
 }));
 
+// GET /api/orders/discounts -> every code (including inactive/expired) with a computed status, newest first
+router.get('/discounts', asyncRoute(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT discount_code_id AS id, code, description, discount_type AS type, discount_value AS value,
+            min_order_cents AS "minOrderCents", max_uses AS "maxUses", times_used AS "timesUsed",
+            to_char(expires_at, 'YYYY-MM-DD') AS "expiresAt",
+            CASE
+              WHEN NOT is_active THEN 'Inactive'
+              WHEN expires_at IS NOT NULL AND expires_at <= LOCALTIMESTAMP THEN 'Expired'
+              WHEN starts_at IS NOT NULL AND starts_at > LOCALTIMESTAMP THEN 'Scheduled'
+              WHEN max_uses IS NOT NULL AND times_used >= max_uses THEN 'Used up'
+              ELSE 'Active'
+            END AS status
+     FROM discount_codes
+     ORDER BY discount_code_id DESC`,
+  );
+  res.json(rows);
+}));
+
+// POST /api/orders/discounts { code, description?, type, value, minOrderCents?, maxUses?, expiresAt?, isActive? }
+// expiresAt is a YYYY-MM-DD date; the code stays valid through the end of that day.
+router.post('/discounts', asyncRoute(async (req, res) => {
+  const body = req.body ?? {};
+  const code = String(body.code ?? '').trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,50}$/.test(code)) {
+    throw new HttpError(400, 'Code must be 3 to 50 letters, numbers, dashes or underscores.');
+  }
+  const type = body.type;
+  if (type !== 'PERCENT' && type !== 'FIXED') throw new HttpError(400, 'Type must be PERCENT or FIXED.');
+  const value = Number(body.value);
+  if (!Number.isInteger(value) || value < 1 || (type === 'PERCENT' && value > 100)) {
+    throw new HttpError(400, type === 'PERCENT'
+      ? 'Percent must be a whole number from 1 to 100.'
+      : 'Fixed discount must be at least 1 cent.');
+  }
+  const minOrderCents = body.minOrderCents == null ? 0 : Number(body.minOrderCents);
+  if (!Number.isInteger(minOrderCents) || minOrderCents < 0) {
+    throw new HttpError(400, 'Minimum order must be zero or more.');
+  }
+  const maxUses = body.maxUses == null ? null : Number(body.maxUses);
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+    throw new HttpError(400, 'Max uses must be 1 or more, or left blank for unlimited.');
+  }
+  const expiresAt = body.expiresAt == null || body.expiresAt === '' ? null : String(body.expiresAt);
+  if (expiresAt !== null && !/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) {
+    throw new HttpError(400, 'Expiry must be a date like 2026-12-31.');
+  }
+  const description = typeof body.description === 'string' && body.description.trim() !== ''
+    ? body.description.trim()
+    : null;
+  const isActive = body.isActive !== false;
+
+  try {
+    const { rows: [row] } = await pool.query(
+      `INSERT INTO discount_codes
+         (code, description, discount_type, discount_value, min_order_cents, max_uses, expires_at, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, ($7::date + TIME '23:59:59'), $8)
+       RETURNING discount_code_id AS id, code`,
+      [code, description, type, value, minOrderCents, maxUses, expiresAt, isActive],
+    );
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.code === '23505') throw new HttpError(409, `"${code}" already exists.`);
+    if (err.code === '22008' || err.code === '22007') throw new HttpError(400, 'Expiry is not a valid date.');
+    throw err;
+  }
+}));
+
 // GET /api/orders?limit=100 -> most recent orders first
 router.get('/', asyncRoute(async (req, res) => {
   const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
