@@ -214,6 +214,17 @@
   line-height: 1.2;
 }
 
+.kiosk-tile-desc {
+  margin-top: 2px;
+  font-size: clamp(12px, calc(var(--tile) / 20), 14px);
+  line-height: 1.25;
+  color: var(--subtle);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .kiosk-tile-price {
   margin-top: 2px;
   font-size: 16px;
@@ -399,6 +410,13 @@
   min-height: 40px;
   padding: 8px 10px;
   font-size: 14px;
+}
+
+.kiosk-modal .addon-desc {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .kiosk-modal .addons li {

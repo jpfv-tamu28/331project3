@@ -233,6 +233,7 @@ export default function Kiosk() {
                       >
                         <span className="kiosk-tile-art"><DrinkArt item={item} /></span>
                         <span className="kiosk-tile-name">{item.name}</span>
+                        {item.description && <span className="kiosk-tile-desc">{item.description}</span>}
                         <span className="kiosk-tile-price">{money(item.priceCents)}</span>
                       </button>
                     </li>

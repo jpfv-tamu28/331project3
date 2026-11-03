@@ -43,7 +43,10 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
       className={className}
     >
       <div className="customize">
-        <p className="muted">{item.category} · {money(item.priceCents)}</p>
+        <div className="customize-intro">
+          <p className="muted">{item.category} · {money(item.priceCents)}</p>
+          {item.description && <p className="customize-desc">{item.description}</p>}
+        </div>
 
         <fieldset>
           <legend>Size</legend>
@@ -79,6 +82,7 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
                   <li key={t.id} className={n > 0 ? 'chosen' : undefined}>
                     <span className="addon-name">
                       {t.name} <span className="muted">+{money(t.priceCents)}</span>
+                      {t.description && <span className="addon-desc">{t.description}</span>}
                     </span>
                     <Stepper
                       small
