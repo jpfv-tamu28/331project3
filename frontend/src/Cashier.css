@@ -290,25 +290,6 @@
   color: var(--subtle);
 }
 
-.extra-sweet {
-  margin-top: 4px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.extra-sweet:hover {
-  background: var(--hover);
-}
-
-.extra-sweet.on {
-  color: var(--text);
-  font-weight: 700;
-}
-
 .addons {
   margin: 0;
   padding: 0;

@@ -129,7 +129,7 @@ describe('parseLines', () => {
         menuItemId: '2',
         size: 'L',
         ice: '0%',
-        sugar: '200%',
+        sugar: '150%',
         quantity: MAX_QUANTITY,
         toppings: [{ menuItemId: '10', count: MAX_TOPPING_COUNT }],
       }),
@@ -140,7 +140,7 @@ describe('parseLines', () => {
         menuItemId: 2,
         size: 'L',
         ice: '0%',
-        sugar: '200%',
+        sugar: '150%',
         quantity: MAX_QUANTITY,
         toppings: [{ menuItemId: 10, count: MAX_TOPPING_COUNT }],
       },
@@ -181,10 +181,22 @@ describe('parseLines', () => {
   it('validates size, ice, and sugar options', () => {
     expectHttpError(() => parseLines([validLine({ size: 'XL' })]), 400, /Size must be S, M or L/);
     expectHttpError(() => parseLines([validLine({ size: 'm' })]), 400, /Size must be S, M or L/);
-    expectHttpError(() => parseLines([validLine({ ice: '25%' })]), 400, /Invalid ice level/);
-    // 200% is only offered for sugar, not ice.
-    expectHttpError(() => parseLines([validLine({ ice: '200%' })]), 400, /Invalid ice level/);
-    expectHttpError(() => parseLines([validLine({ sugar: '75%' })]), 400, /Invalid sugar level/);
+    // Levels go in 25% steps; 125% and 150% are only offered for sugar, not ice.
+    expectHttpError(() => parseLines([validLine({ ice: '125%' })]), 400, /Invalid ice level/);
+    expectHttpError(() => parseLines([validLine({ ice: '150%' })]), 400, /Invalid ice level/);
+    expectHttpError(() => parseLines([validLine({ ice: '30%' })]), 400, /Invalid ice level/);
+    expectHttpError(() => parseLines([validLine({ sugar: '175%' })]), 400, /Invalid sugar level/);
+    expectHttpError(() => parseLines([validLine({ sugar: '200%' })]), 400, /Invalid sugar level/);
+    expectHttpError(() => parseLines([validLine({ sugar: '60%' })]), 400, /Invalid sugar level/);
+  });
+
+  it('accepts every 25% step for ice (0–100%) and sugar (0–150%)', () => {
+    for (const ice of ['0%', '25%', '50%', '75%', '100%']) {
+      assert.equal(parseLines([validLine({ ice })])[0].ice, ice);
+    }
+    for (const sugar of ['0%', '25%', '50%', '75%', '100%', '125%', '150%']) {
+      assert.equal(parseLines([validLine({ sugar })])[0].sugar, sugar);
+    }
   });
 
   it('validates add-on IDs and counts', () => {
@@ -411,7 +423,7 @@ describe('orders HTTP routes', () => {
             menuItemId: 2,
             size: 'L',
             ice: '50%',
-            sugar: '200%',
+            sugar: '150%',
             quantity: 3,
             toppings: [{ menuItemId: 10, count: 2 }],
           },
@@ -435,7 +447,7 @@ describe('orders HTTP routes', () => {
       { table: 'orders', params: [1, 2136, 'Cash', 7, 218] },
       {
         table: 'order_items',
-        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 200% sugar)', 3, 575],
+        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 575],
       },
       // 2 scoops on 3 drinks = quantity 6, linked to parent order_item_id 101
       {
