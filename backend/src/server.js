@@ -10,6 +10,7 @@ import inventoryRoutes from './routes/inventory.js';
 import employeeRoutes from './routes/employees.js';
 import orderRoutes from './routes/orders.js';
 import reportRoutes from './routes/reports.js';
+import weatherRoutes from './routes/weather.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -35,6 +36,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/weather', weatherRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found.' });

@@ -38,5 +38,7 @@ export const Api = {
   reportList: () => api.get('/reports').then((r) => r.data),
   report: (key, from, to) => api.get(`/reports/${key}`, { params: { from, to } }).then((r) => r.data),
   xReport: (date) => api.get('/reports/x-report', { params: { date } }).then((r) => r.data),
+  weather: (zip) => api.get('/weather', { params: zip ? { zip } : {} }).then((r) => r.data),
+
   productUsage: (from, to) => api.get('/reports/product-usage', { params: { from, to } }).then((r) => r.data),
 };

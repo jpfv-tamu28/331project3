@@ -24,6 +24,10 @@
   --alert-fg: #a8302a;
   --alert-bg: #fbe4e1;
   --focus: #8b5e3c;
+  /* Text on --text / --accent fills (primary buttons, selected options, badges); the kiosk's dark themes flip these. */
+  --on-text: #fff;
+  --on-accent: #fff;
+  --primary-active: #000;
 
   --radius-sm: 6px;
   --radius: 8px;
@@ -103,7 +107,7 @@ button:disabled {
   z-index: 100;
   padding: 8px 12px;
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
   border-radius: var(--radius);
   text-decoration: none;
 }
@@ -138,7 +142,7 @@ button:disabled {
 
 .btn-primary {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -146,7 +150,7 @@ button:disabled {
 }
 
 .btn-primary:active:not(:disabled) {
-  background: #000;
+  background: var(--primary-active);
 }
 
 .btn-secondary {
@@ -281,7 +285,7 @@ select.field {
 
 .chip[aria-pressed='true'] {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
 }
 
 .segmented {
@@ -306,7 +310,7 @@ select.field {
 
 .segmented button[aria-checked='true'] {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
   font-weight: 700;
 }
 
@@ -603,7 +607,7 @@ select.field {
 .dense-row:hover .edit-chip,
 .dense-row:focus-visible .edit-chip {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
 }
 
 /* ---------- Stat tiles ---------- */

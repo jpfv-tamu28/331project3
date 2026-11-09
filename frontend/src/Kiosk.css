@@ -1,9 +1,93 @@
-/* Self-order kiosk, sized for a landscape iPad: big type, big touch targets,
-   sections scrolled left to right with two rows of square tiles each. */
+:root[data-kiosk-theme='dark'] {
+  --bg: #151311;
+  --nav-bg: #1b1916;
+  --surface: #1d1b18;
+  --hover: #2a2723;
+  --row-hover: #24211e;
+  --row-pressed: #2e2a26;
+  --row-line: #2a2723;
+  --line: #36322d;
+  --line-strong: #4d4842;
+  --chip: #2a2723;
+  --text: #f2eee8;
+  --subtle: #cdc5bb;
+  --muted: #a89f94;
+  --accent: #d9a877;
+  --bar: #d9a877;
+  --primary-hover: #d8d2ca;
+  --primary-active: #bfb8af;
+  --success: #6cc08f;
+  --warning: #e3b158;
+  --error: #f2867c;
+  --alert-fg: #f6aaa2;
+  --alert-bg: #3b211e;
+  --focus: #d9a877;
+  --on-text: #1d1b18;
+  --on-accent: #1d1b18;
+  --tile-mix: 24%;
+  --tile-base: var(--surface);
+  color-scheme: dark;
+}
+
+:root[data-kiosk-theme='contrast'] {
+  --bg: #000;
+  --nav-bg: #000;
+  --surface: #000;
+  --hover: #262626;
+  --row-hover: #1a1a1a;
+  --row-pressed: #333;
+  --row-line: #fff;
+  --line: #fff;
+  --line-strong: #fff;
+  --chip: #000;
+  --text: #fff;
+  --subtle: #fff;
+  --muted: #fff;
+  --accent: #ffd60a;
+  --bar: #ffd60a;
+  --primary-hover: #ffd60a;
+  --primary-active: #ffd60a;
+  --success: #5ef38c;
+  --warning: #ffd60a;
+  --error: #ff8a80;
+  --alert-fg: #fff;
+  --alert-bg: #000;
+  --focus: #ffd60a;
+  --on-text: #000;
+  --on-accent: #000;
+  --tile-mix: 0%;
+  --tile-base: #000;
+  color-scheme: dark;
+}
+
+:root[data-kiosk-theme='contrast'] :is(.kiosk-tile, .kiosk-icon-btn, .kiosk-cart-thumb, .segmented button, .btn, .stepper button) {
+  border: 2px solid var(--text);
+}
+
+:root[data-kiosk-theme='contrast'] :is(.segmented button[aria-checked='true'], .btn-primary) {
+  border-color: var(--accent);
+}
+
+:root[data-kiosk-theme='contrast'] .kiosk-tile-desc,
+:root[data-kiosk-theme='contrast'] .kiosk-link-btn {
+  color: var(--text);
+}
+
+:root[data-kiosk-theme='contrast'] :focus-visible {
+  outline-width: 3px;
+}
+
+:root[data-kiosk-theme] body {
+  background: var(--bg);
+}
+
+:root[data-kiosk-theme] .toast-text :is(strong, p) {
+  font-size: calc(13px * var(--kiosk-text, 1));
+}
+
 .kiosk {
   --kiosk-header: 76px;
   --kiosk-tabs: 60px;
-  /* Two rows of tiles fill the height under the header, tabs and section titles. */
   --tile: clamp(150px, calc((100dvh - var(--kiosk-header) - var(--kiosk-tabs) - 112px) / 2), 320px);
   --tile-gap: 16px;
 
@@ -12,7 +96,7 @@
   height: 100%;
   overflow: hidden;
   background: var(--surface);
-  font-size: 16px;
+  font-size: calc(16px * var(--kiosk-text, 1));
 }
 
 /* ---------- Header ---------- */
@@ -26,14 +110,28 @@
 }
 
 .kiosk-brand {
-  font-size: 28px;
+  font-size: calc(28px * var(--kiosk-text, 1));
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
-.kiosk-tagline {
+.kiosk-settings-btn {
   justify-self: end;
-  color: var(--muted);
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  color: var(--text);
+}
+
+.kiosk-settings-btn img {
+  width: 20px;
+  height: 20px;
+}
+
+/* gear.png is black on transparent; flip it to white on the dark themes. */
+:root:is([data-kiosk-theme='dark'], [data-kiosk-theme='contrast']) .kiosk-settings-btn img {
+  filter: invert(1);
 }
 
 .kiosk-cart-toggle {
@@ -61,10 +159,9 @@
   background: var(--hover);
 }
 
-/* Filled while the order panel is open, outlined while it's closed. */
 .kiosk-cart-toggle.active {
   background: var(--text);
-  color: #fff;
+  color: var(--on-text);
 }
 
 .kiosk-cart-badge {
@@ -77,8 +174,8 @@
   border: 2px solid var(--surface);
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
-  font-size: 13px;
+  color: var(--on-accent);
+  font-size: calc(13px * var(--kiosk-text, 1));
   line-height: 20px;
   text-align: center;
   animation: kiosk-bump 0.35s ease-out;
@@ -112,7 +209,7 @@
   border-bottom: 4px solid transparent;
   background: none;
   color: var(--muted);
-  font-size: 17px;
+  font-size: calc(17px * var(--kiosk-text, 1));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -157,7 +254,7 @@
 
 .kiosk-section h2 {
   height: 48px;
-  font-size: 26px;
+  font-size: calc(26px * var(--kiosk-text, 1));
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -181,7 +278,8 @@
   padding: 14px 16px 16px;
   border: 0;
   border-radius: 20px;
-  background: var(--tile-bg, var(--chip));
+  /* The drink's flavor color washed toward the background (white in light mode, as before). */
+  background: color-mix(in srgb, var(--tile-color, #c9a27e) var(--tile-mix, 20%), var(--tile-base, #fff));
   color: var(--text);
   text-align: left;
   transition: transform 0.12s, box-shadow 0.12s;
@@ -209,14 +307,14 @@
 
 .kiosk-tile-name {
   margin-top: 8px;
-  font-size: clamp(15px, calc(var(--tile) / 15), 19px);
+  font-size: calc(clamp(15px, calc(var(--tile) / 15), 19px) * var(--kiosk-text, 1));
   font-weight: 800;
   line-height: 1.2;
 }
 
 .kiosk-tile-desc {
   margin-top: 2px;
-  font-size: clamp(12px, calc(var(--tile) / 20), 14px);
+  font-size: calc(clamp(12px, calc(var(--tile) / 20), 14px) * var(--kiosk-text, 1));
   line-height: 1.25;
   color: var(--subtle);
   display: -webkit-box;
@@ -227,7 +325,7 @@
 
 .kiosk-tile-price {
   margin-top: 2px;
-  font-size: 16px;
+  font-size: calc(16px * var(--kiosk-text, 1));
   font-weight: 700;
   color: var(--accent);
 }
@@ -263,7 +361,7 @@
 }
 
 .kiosk-cart-header h2 {
-  font-size: 22px;
+  font-size: calc(22px * var(--kiosk-text, 1));
   font-weight: 800;
   outline: none;
 }
@@ -274,7 +372,8 @@
   border: 0;
   border-radius: 50%;
   background: var(--chip);
-  font-size: 16px;
+  color: var(--text);
+  font-size: calc(16px * var(--kiosk-text, 1));
 }
 
 .kiosk-icon-btn:hover {
@@ -326,7 +425,7 @@
 }
 
 .kiosk-cart-info > span {
-  font-size: 13px;
+  font-size: calc(13px * var(--kiosk-text, 1));
   color: var(--muted);
 }
 
@@ -343,7 +442,7 @@
   border-radius: var(--radius);
   background: none;
   color: var(--subtle);
-  font-size: 14px;
+  font-size: calc(14px * var(--kiosk-text, 1));
   font-weight: 600;
   text-decoration: underline;
 }
@@ -367,14 +466,14 @@
 
 .kiosk-cart-label {
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--kiosk-text, 1));
   font-weight: 700;
   color: var(--subtle);
 }
 
 .kiosk-place {
   min-height: 56px;
-  font-size: 17px;
+  font-size: calc(17px * var(--kiosk-text, 1));
   border-radius: 999px;
 }
 
@@ -384,16 +483,16 @@
 }
 
 .kiosk-modal .modal-header h2 {
-  font-size: 22px;
+  font-size: calc(22px * var(--kiosk-text, 1));
 }
 
 .kiosk-modal .modal-body {
-  font-size: 15px;
+  font-size: calc(15px * var(--kiosk-text, 1));
 }
 
 .kiosk-modal .segmented button {
   min-height: 48px;
-  font-size: 15px;
+  font-size: calc(15px * var(--kiosk-text, 1));
 }
 
 .kiosk-modal .stepper button {
@@ -406,22 +505,42 @@
   height: 36px;
 }
 
+.kiosk-modal .customize legend {
+  font-size: calc(13px * var(--kiosk-text, 1));
+}
+
+.kiosk-modal .stepper output {
+  font-size: calc(16px * var(--kiosk-text, 1));
+}
+
+.kiosk-modal .stepper.small output {
+  font-size: calc(15px * var(--kiosk-text, 1));
+}
+
+.kiosk-modal .addons .muted {
+  font-size: calc(13px * var(--kiosk-text, 1));
+}
+
+.kiosk-modal .line-total {
+  font-size: calc(18px * var(--kiosk-text, 1));
+}
+
 .kiosk-modal .addon-desc {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--kiosk-text, 1));
   font-weight: 400;
   color: var(--muted);
 }
 
 .kiosk-modal .addons li {
   padding: 8px 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--kiosk-text, 1));
 }
 
 .kiosk-modal .btn {
   min-height: 48px;
   padding: 0 22px;
-  font-size: 15px;
+  font-size: calc(15px * var(--kiosk-text, 1));
   border-radius: 999px;
 }
 
@@ -441,7 +560,57 @@
 }
 
 .kiosk-done-number {
-  font-size: 40px;
+  font-size: calc(40px * var(--kiosk-text, 1));
   font-weight: 800;
   color: var(--text);
+}
+
+.kiosk-settings .segmented button {
+  padding: 8px 6px;
+  line-height: 1.2;
+}
+
+.kiosk-weather {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.kiosk-weather h3 {
+  margin: 0 0 10px;
+  font-size: calc(13px * var(--kiosk-text, 1));
+  font-weight: 700;
+  color: var(--subtle);
+}
+
+.kiosk-weather-now {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.kiosk-weather-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  color: var(--accent);
+}
+
+.kiosk-weather-temp {
+  font-size: calc(36px * var(--kiosk-text, 1));
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kiosk-weather-desc {
+  color: var(--muted);
+}
+
+.kiosk-weather-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
 }
