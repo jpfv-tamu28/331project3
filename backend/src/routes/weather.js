@@ -1,12 +1,30 @@
 import { Router } from 'express';
 import { HttpError, asyncRoute } from '../http.js';
 
-export const DEFAULT_ZIP = process.env.WEATHER_ZIP || '77840';
-const ZIP_PATTERN = /^\d{5}$/;
+// The kiosk always shows the weather for the store's zip code.
+const ZIP = '77840';
+const PLACE = 'College Station, TX';
+const LATITUDE = 30.6045;
+const LONGITUDE = -96.3123;
 const WEATHER_TTL_MS = 10 * 60 * 1000;
 
+// api.weather.gov rejects requests without a User-Agent that names the app.
+const NWS_HEADERS = { 'User-Agent': 'BobaBops-Kiosk/1.0 (CSCE 331 class project)', Accept: 'application/geo+json' };
+
+// The National Weather Service describes conditions in words ("Partly Sunny", "Rain Showers Likely").
+// Checked in order, so "Chance Rain And Snow" counts as snow and "Mostly Cloudy" isn't read as clear.
+const NWS_ICONS = [
+  [/thunder|t-storm/i, 'thunderstorm'],
+  [/snow|sleet|flurr|ice|wintry|blizzard/i, 'snow'],
+  [/drizzle/i, 'drizzle'],
+  [/rain|shower/i, 'rain'],
+  [/fog|haze|mist|smoke|dust/i, 'fog'],
+  [/partly|mostly sunny|mostly clear/i, 'partly-cloudy'],
+  [/sunny|clear|fair/i, 'clear'],
+];
+
 // WMO weather codes (https://open-meteo.com/en/docs) grouped into the icons the kiosk can draw.
-const CONDITIONS = [
+const WMO_CONDITIONS = [
   [[0], 'clear', 'Clear'],
   [[1], 'clear', 'Mostly clear'],
   [[2], 'partly-cloudy', 'Partly cloudy'],
@@ -18,90 +36,89 @@ const CONDITIONS = [
   [[95, 96, 99], 'thunderstorm', 'Thunderstorm'],
 ];
 
-/** Maps a WMO code to { icon, condition }; unknown codes fall back to a plain cloud. */
-export function describeWeatherCode(code) {
-  const match = CONDITIONS.find(([codes]) => codes.includes(code));
+function describeNwsForecast(text) {
+  const icon = NWS_ICONS.find(([pattern]) => pattern.test(text))?.[1] ?? 'cloudy';
+  return { icon, condition: text };
+}
+
+function describeWeatherCode(code) {
+  const match = WMO_CONDITIONS.find(([codes]) => codes.includes(code));
   return match ? { icon: match[1], condition: match[2] } : { icon: 'cloudy', condition: 'Cloudy' };
 }
 
-async function defaultFetchJson(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) {
-    const err = new Error(`${url} responded with ${res.status}`);
-    err.status = res.status;
-    throw err;
+async function fetchJson(url, headers = {}) {
+  let res;
+  try {
+    res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+  } catch (err) {
+    // Node's "fetch failed" hides the reason (DNS, refused, timeout) in err.cause.
+    throw new Error(`${url} failed: ${err.cause?.code ?? err.cause?.message ?? err.message}`);
   }
+  if (!res.ok) throw new Error(`${url} responded with ${res.status}`);
   return res.json();
 }
 
-export function createWeatherRoutes({ fetchJson = defaultFetchJson, now = Date.now } = {}) {
-  const router = Router();
-  const places = new Map();
-  const cache = new Map();
-
-  async function lookupPlace(zip) {
-    if (places.has(zip)) return places.get(zip);
-    let body;
-    try {
-      body = await fetchJson(`https://api.zippopotam.us/us/${zip}`);
-    } catch (err) {
-      if (err.status === 404) throw new HttpError(404, `Zip code ${zip} was not found.`);
-      throw err;
-    }
-    const place = body.places?.[0];
-    if (!place) throw new HttpError(404, `Zip code ${zip} was not found.`);
-    const result = {
-      latitude: Number(place.latitude),
-      longitude: Number(place.longitude),
-      name: `${place['place name']}, ${place['state abbreviation']}`,
-    };
-    places.set(zip, result);
-    return result;
+// Primary source: the National Weather Service. Free, no key, and no rate limit shared with
+// everyone else on a cloud host the way Open-Meteo's free tier has.
+let nwsForecastUrl = null; // the store's NWS grid never changes, so look it up once
+async function fromNws() {
+  if (!nwsForecastUrl) {
+    const point = await fetchJson(`https://api.weather.gov/points/${LATITUDE},${LONGITUDE}`, NWS_HEADERS);
+    nwsForecastUrl = point.properties.forecastHourly;
   }
-
-  // GET /api/weather?zip=77840 -> { zip, place, temperatureF, icon, condition, isDay, observedAt }
-  router.get('/', asyncRoute(async (req, res) => {
-    const zip = String(req.query.zip ?? DEFAULT_ZIP).trim();
-    if (!ZIP_PATTERN.test(zip)) throw new HttpError(400, 'Zip code must be 5 digits.');
-
-    const cached = cache.get(zip);
-    if (cached && now() - cached.at < WEATHER_TTL_MS) {
-      res.json(cached.data);
-      return;
-    }
-
-    try {
-      const place = await lookupPlace(zip);
-      const params = new URLSearchParams({
-        latitude: place.latitude,
-        longitude: place.longitude,
-        current: 'temperature_2m,weather_code,is_day',
-        temperature_unit: 'fahrenheit',
-        timezone: 'auto',
-      });
-      const { current } = await fetchJson(`https://api.open-meteo.com/v1/forecast?${params}`);
-      const data = {
-        zip,
-        place: place.name,
-        temperatureF: Math.round(current.temperature_2m),
-        ...describeWeatherCode(current.weather_code),
-        isDay: current.is_day === 1,
-        observedAt: current.time,
-      };
-      cache.set(zip, { at: now(), data });
-      res.json(data);
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      if (cached) {
-        res.json(cached.data);
-        return;
-      }
-      console.error('[WARN] Weather lookup failed:', err.message);
-      throw new HttpError(502, 'The weather service is unavailable right now.');
-    }
-  }));
-
-  return router;
+  const hour = (await fetchJson(nwsForecastUrl, NWS_HEADERS)).properties.periods[0];
+  const f = hour.temperatureUnit === 'C' ? (hour.temperature * 9) / 5 + 32 : hour.temperature;
+  return {
+    temperatureF: Math.round(f),
+    ...describeNwsForecast(hour.shortForecast),
+    isDay: hour.isDaytime,
+    observedAt: hour.startTime,
+  };
 }
 
-export default createWeatherRoutes();
+// Fallback: Open-Meteo. Its free tier limits requests per IP, and Render's outbound IPs are shared,
+// so on the deployed site it often answers 429.
+async function fromOpenMeteo() {
+  const params = new URLSearchParams({
+    latitude: LATITUDE,
+    longitude: LONGITUDE,
+    current: 'temperature_2m,weather_code,is_day',
+    temperature_unit: 'fahrenheit',
+    timezone: 'auto',
+  });
+  const { current } = await fetchJson(`https://api.open-meteo.com/v1/forecast?${params}`);
+  return {
+    temperatureF: Math.round(current.temperature_2m),
+    ...describeWeatherCode(current.weather_code),
+    isDay: current.is_day === 1,
+    observedAt: current.time,
+  };
+}
+
+const SOURCES = [['nws', fromNws], ['open-meteo', fromOpenMeteo]];
+let cached = null; // { at, data }
+
+const router = Router();
+
+// GET /api/weather -> { zip, place, temperatureF, icon, condition, isDay, observedAt, source }
+router.get('/', asyncRoute(async (_req, res) => {
+  if (cached && Date.now() - cached.at < WEATHER_TTL_MS) {
+    res.json(cached.data);
+    return;
+  }
+  for (const [source, load] of SOURCES) {
+    try {
+      const data = { zip: ZIP, place: PLACE, ...(await load()), source };
+      cached = { at: Date.now(), data };
+      res.json(data);
+      return;
+    } catch (err) {
+      console.error(`[WARN] Weather lookup failed (${source}):`, err.message);
+    }
+  }
+  // Every source failed: the last reading is better than nothing.
+  if (!cached) throw new HttpError(502, 'The weather service is unavailable right now.');
+  res.json(cached.data);
+}));
+
+export default router;
