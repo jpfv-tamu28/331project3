@@ -33,6 +33,8 @@ export const Api = {
   orders: (limit = 100) => api.get('/orders', { params: { limit } }).then((r) => r.data),
   orderItems: (id) => api.get(`/orders/${id}/items`).then((r) => r.data),
   checkDiscount: (code) => api.get(`/orders/discounts/${encodeURIComponent(code)}`).then((r) => r.data),
+  discounts: () => api.get('/orders/discounts').then((r) => r.data),
+  createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   createOrder: (order) => api.post('/orders', order).then((r) => r.data),
 
   reportList: () => api.get('/reports').then((r) => r.data),
