@@ -11,6 +11,7 @@ import inventoryRoutes from './routes/inventory.js';
 import employeeRoutes from './routes/employees.js';
 import orderRoutes from './routes/orders.js';
 import reportRoutes from './routes/reports.js';
+import weatherRoutes from './routes/weather.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);

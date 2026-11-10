@@ -21,9 +21,3 @@ export function flavorColor(name) {
   return FLAVORS.find(([pattern]) => pattern.test(name))?.[1] ?? FALLBACK;
 }
 
-/** Mixes a #rrggbb color toward white; amount 0 = unchanged, 1 = white. */
-export function tint(hex, amount) {
-  const n = Number.parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
-}
