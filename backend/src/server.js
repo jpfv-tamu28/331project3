@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { pool } from './db.js';
+import authRoutes, { attachUser, requireAuth } from './routes/auth.js';
 import menuRoutes from './routes/menu.js';
 import inventoryRoutes from './routes/inventory.js';
 import employeeRoutes from './routes/employees.js';
@@ -16,12 +17,15 @@ import pokemonRoutes from './routes/pokemon.js';
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 
+app.set('trust proxy', 1);
+
 // Comma-separated list of allowed browser origins. Only needed when the frontend
 // is hosted on a different domain; same-origin requests don't need CORS.
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',').map((o) => o.trim()).filter(Boolean);
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '100kb' }));
+app.use(attachUser());
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -32,11 +36,25 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-app.use('/api/menu', menuRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/reports', reportRoutes);
+const requireStaffAuth = requireAuth();
+app.use('/api/auth', authRoutes);
+app.use(
+  '/api/menu',
+  (req, res, next) => (req.method === 'GET' ? next() : requireStaffAuth(req, res, next)),
+  menuRoutes,
+);
+app.use('/api/inventory', requireStaffAuth, inventoryRoutes);
+app.use('/api/employees', requireStaffAuth, employeeRoutes);
+app.use(
+  '/api/orders',
+  (req, res, next) => {
+    const isPublicOrderRoute = (req.method === 'POST' && req.path === '/')
+      || (req.method === 'GET' && /^\/discounts\/[^/]+$/.test(req.path));
+    return isPublicOrderRoute ? next() : requireStaffAuth(req, res, next);
+  },
+  orderRoutes,
+);
+app.use('/api/reports', requireStaffAuth, reportRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/pokemon', pokemonRoutes);
 

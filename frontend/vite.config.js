@@ -9,7 +9,10 @@ export default defineConfig({
     // Lets the dev server serve ../shared, which the API imports too.
     fs: { allow: ['..'] },
     proxy: {
-      '/api': process.env.VITE_API_PROXY || 'http://localhost:3001',
+      '/api': {
+        target: process.env.VITE_API_PROXY || 'http://localhost:3001',
+        xfwd: true,
+      },
     },
   },
 })
