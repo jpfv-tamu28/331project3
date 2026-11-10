@@ -9,6 +9,7 @@ import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
 import CartPanel from './kiosk/CartPanel';
 import DrinkArt from './kiosk/DrinkArt';
+import OrderBuddy from './kiosk/OrderBuddy';
 import { flavorColor } from './kiosk/drinkColors';
 import SettingsDialog from './kiosk/SettingsDialog';
 import { useKioskSettings } from './kiosk/useKioskSettings';
@@ -286,6 +287,7 @@ export default function Kiosk() {
             {PAYMENT_NOTES[payment]}
           </p>
           <p>We'll call your number when your drinks are ready.</p>
+          <OrderBuddy orderId={placed.id} />
         </Modal>
       )}
     </main>
