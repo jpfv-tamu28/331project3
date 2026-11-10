@@ -12,6 +12,7 @@ import employeeRoutes from './routes/employees.js';
 import orderRoutes from './routes/orders.js';
 import reportRoutes from './routes/reports.js';
 import weatherRoutes from './routes/weather.js';
+import pokemonRoutes from './routes/pokemon.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -36,7 +37,6 @@ app.get('/api/health', async (_req, res) => {
 });
 
 const requireStaffAuth = requireAuth();
-
 app.use('/api/auth', authRoutes);
 app.use(
   '/api/menu',
@@ -55,6 +55,8 @@ app.use(
   orderRoutes,
 );
 app.use('/api/reports', requireStaffAuth, reportRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/pokemon', pokemonRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found.' });

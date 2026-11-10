@@ -48,12 +48,15 @@ export const Api = {
   discounts: () => api.get('/orders/discounts').then((r) => r.data),
   createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   checkDiscount: (code) => api.get(`/orders/discounts/${encodeURIComponent(code)}`).then((r) => r.data),
+  discounts: () => api.get('/orders/discounts').then((r) => r.data),
+  createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   createOrder: (order) => api.post('/orders', order).then((r) => r.data),
 
   reportList: () => api.get('/reports').then((r) => r.data),
   report: (key, from, to) => api.get(`/reports/${key}`, { params: { from, to } }).then((r) => r.data),
   xReport: (date) => api.get('/reports/x-report', { params: { date } }).then((r) => r.data),
   weather: (zip) => api.get('/weather', { params: zip ? { zip } : {} }).then((r) => r.data),
+  pokemon: (id) => api.get(`/pokemon/${id}`).then((r) => r.data),
 
   productUsage: (from, to) => api.get('/reports/product-usage', { params: { from, to } }).then((r) => r.data),
 };
