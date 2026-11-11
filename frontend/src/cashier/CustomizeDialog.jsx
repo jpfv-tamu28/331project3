@@ -4,7 +4,7 @@ import { Segmented } from '../components/Segmented';
 import { Stepper } from '../components/Stepper';
 import { money } from '../format';
 import {
-  EXTRA_SWEET, LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES,
+  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES, SUGAR_LEVELS,
 } from '../../../shared/orderRules.js';
 import { lineCents } from './order';
 
@@ -23,7 +23,6 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
     toppings.map((t) => [t.id, existing?.toppings.find((x) => x.item.id === t.id)?.count ?? 0]),
   ));
 
-  const extraSweet = sugar === EXTRA_SWEET;
   const line = useMemo(() => ({
     item,
     size,
@@ -43,7 +42,10 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
       className={className}
     >
       <div className="customize">
-        <p className="muted">{item.category} · {money(item.priceCents)}</p>
+        <div className="customize-intro">
+          <p className="muted">{item.category} · {money(item.priceCents)}</p>
+          {item.description && <p className="customize-desc">{item.description}</p>}
+        </div>
 
         <fieldset>
           <legend>Size</legend>
@@ -52,21 +54,12 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
 
         <fieldset>
           <legend>Ice Level</legend>
-          <Segmented label="Ice level" options={LEVELS} value={ice} onChange={setIce} />
+          <Segmented label="Ice level" options={ICE_LEVELS} value={ice} onChange={setIce} />
         </fieldset>
 
         <fieldset>
           <legend>Sugar Level</legend>
-          <Segmented label="Sugar level" options={LEVELS} value={extraSweet ? null : sugar} onChange={setSugar} />
-          {/* 200% is a rare request, so it sits as a quiet toggle under the regular levels. */}
-          <button
-            type="button"
-            className={`extra-sweet${extraSweet ? ' on' : ''}`}
-            aria-pressed={extraSweet}
-            onClick={() => setSugar(extraSweet ? '100%' : EXTRA_SWEET)}
-          >
-            {extraSweet ? '✓' : '+'} Extra sweet (200%)
-          </button>
+          <Segmented label="Sugar level" options={SUGAR_LEVELS} value={sugar} onChange={setSugar} />
         </fieldset>
 
         {toppings.length > 0 && (
@@ -79,6 +72,7 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
                   <li key={t.id} className={n > 0 ? 'chosen' : undefined}>
                     <span className="addon-name">
                       {t.name} <span className="muted">+{money(t.priceCents)}</span>
+                      {t.description && <span className="addon-desc">{t.description}</span>}
                     </span>
                     <Stepper
                       small

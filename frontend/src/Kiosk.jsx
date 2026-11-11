@@ -8,7 +8,13 @@ import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
 import CartPanel from './kiosk/CartPanel';
-import DrinkArt, { flavorColor, tint } from './kiosk/DrinkArt';
+import DrinkArt from './kiosk/DrinkArt';
+import OrderBuddy from './kiosk/OrderBuddy';
+import { flavorColor } from './kiosk/drinkColors';
+import SettingsDialog from './kiosk/SettingsDialog';
+import { useKioskSettings } from './kiosk/useKioskSettings';
+import gearIcon from './assets/gear.png';
+import TranslateButton from './components/TranslateButton';
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
@@ -23,7 +29,8 @@ const PAYMENT_NOTES = {
 
 /**
  * Self-order kiosk: menu sections laid side by side and scrolled left to right, two rows of
- * large square tiles per section, section tabs across the top, and a cart panel toggled from the top left.
+ * large square tiles per section, section tabs across the top, a cart panel toggled from the top left,
+ * and a settings gear (theme, text size, weather) at the top right.
  * Reuses the cashier's customize dialog and pricing so both screens charge the same way.
  */
 export default function Kiosk() {
@@ -37,6 +44,8 @@ export default function Kiosk() {
   const [placed, setPlaced] = useState(null); // order returned by the server
   const [activeSection, setActiveSection] = useState(null);
   const [bump, setBump] = useState(0); // restarts the cart badge animation on every add
+  const [settings, updateSettings] = useKioskSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const trackRef = useRef(null);
   const tabRefs = useRef({});
 
@@ -146,6 +155,7 @@ export default function Kiosk() {
       setPlacing(false);
     }
   };
+  
 
   return (
     <main className="kiosk">
@@ -171,7 +181,16 @@ export default function Kiosk() {
           <span className="kiosk-cart-total">{money(totals.total)}</span>
         </button>
         <h1 className="kiosk-brand">Boba Bops</h1>
-        <p className="kiosk-tagline">Tap a drink to start</p>
+        <TranslateButton />
+        <button
+          type="button"
+          className="kiosk-icon-btn kiosk-settings-btn"
+          aria-haspopup="dialog"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <img src={gearIcon} alt="" />
+          <span className="sr-only">Settings</span>
+        </button>
       </header>
 
       <nav className="kiosk-tabs" aria-label="Menu sections">
@@ -227,11 +246,12 @@ export default function Kiosk() {
                       <button
                         type="button"
                         className="kiosk-tile"
-                        style={{ '--tile-bg': tint(flavorColor(item.name), 0.8) }}
+                        style={{ '--tile-color': flavorColor(item.name) }}
                         onClick={() => setEditing({ item, index: -1 })}
                       >
                         <span className="kiosk-tile-art"><DrinkArt item={item} /></span>
                         <span className="kiosk-tile-name">{item.name}</span>
+                        {item.description && <span className="kiosk-tile-desc">{item.description}</span>}
                         <span className="kiosk-tile-price">{money(item.priceCents)}</span>
                       </button>
                     </li>
@@ -258,6 +278,10 @@ export default function Kiosk() {
         />
       )}
 
+      {settingsOpen && (
+        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
+      )}
+
       {placed && (
         <Modal title="Thank you!" submitLabel="Start a new order" onClose={startOver} className="kiosk-modal kiosk-done">
           <p className="kiosk-done-number">Order #{placed.id}</p>
@@ -266,6 +290,7 @@ export default function Kiosk() {
             {PAYMENT_NOTES[payment]}
           </p>
           <p>We'll call your number when your drinks are ready.</p>
+          <OrderBuddy orderId={placed.id} />
         </Modal>
       )}
     </main>

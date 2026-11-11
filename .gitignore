@@ -5,3 +5,4 @@ lib/
 *.iml
 frontend/dist/
 .env
+lt-env/

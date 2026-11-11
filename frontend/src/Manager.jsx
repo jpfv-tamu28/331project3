@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
+import { useAuth } from './components/AuthProvider';
 import MenuTab from './manager/MenuTab';
 import InventoryTab from './manager/InventoryTab';
 import EmployeesTab from './manager/EmployeesTab';
 import ReportsTab from './manager/ReportsTab';
 import XReportTab from './manager/XReportTab';
 import ProductUsageTab from './manager/ProductUsageTab';
+import DiscountsTab from './manager/DiscountsTab';
 import './Manager.css';
 
 const PAGES = [
@@ -14,9 +16,11 @@ const PAGES = [
   { key: 'reports', label: 'Reports', Component: ReportsTab },
   { key: 'x-report', label: 'X-Report', Component: XReportTab },
   { key: 'usage', label: 'Product Usage', Component: ProductUsageTab },
+  { key: 'discounts', label: 'Discounts', Component: DiscountsTab },
 ];
 
 export default function Manager() {
+  const { user, logout } = useAuth();
   const [active, setActiveKey] = useState(PAGES[0].key);
   // Visited tabs stay mounted (hidden) so filters, dates and results survive switching, like CardLayout.
   const [visited, setVisited] = useState(() => new Set([PAGES[0].key]));
@@ -43,9 +47,21 @@ export default function Manager() {
       <div className="manager-top">
         <div className="manager-header">
           <h1>Manager Dashboard</h1>
-          <button type="button" className="btn btn-secondary" onClick={() => setRefreshKey((k) => k + 1)}>
-            Refresh
-          </button>
+          <div className="manager-header-actions">
+            {user && (
+              <span className="subtle" title={user.email}>
+                {user.name}
+              </span>
+            )}
+            <button type="button" className="btn btn-secondary" onClick={() => setRefreshKey((k) => k + 1)}>
+              Refresh
+            </button>
+            {user && (
+              <button type="button" className="btn btn-secondary" onClick={logout}>
+                Sign Out
+              </button>
+            )}
+          </div>
         </div>
         <div className="tab-row manager-tabs" role="tablist" aria-label="Manager sections">
           {PAGES.map((page, i) => (

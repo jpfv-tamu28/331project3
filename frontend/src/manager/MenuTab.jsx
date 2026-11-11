@@ -5,7 +5,7 @@ import { Modal } from '../components/Modal';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { capitalize, money } from '../format';
+import { capitalize, money, parsePriceCents } from '../format';
 import { ITEM_TYPES } from '../../../shared/orderRules.js';
 import SeasonalItemDialog from './SeasonalItemDialog';
 
@@ -24,14 +24,6 @@ const describe = (m) => ({
   value: money(m.priceCents),
   badge: m.isAvailable ? null : { text: 'Unavailable' },
 });
-
-/** "5.25" -> 525, or null if it isn't a valid non-negative amount with at most 2 decimals. */
-export function parsePriceCents(text) {
-  const trimmed = String(text).trim();
-  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
-  const [whole, frac = ''] = trimmed.split('.');
-  return Number(whole) * 100 + Number(frac.padEnd(2, '0'));
-}
 
 export default function MenuTab({ refreshKey }) {
   const menu = useResource(() => Api.menu(), [refreshKey]);

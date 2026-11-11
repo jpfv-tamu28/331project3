@@ -5,9 +5,8 @@ import { Segmented } from '../components/Segmented';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { capitalize, quantity } from '../format';
+import { capitalize, parsePriceCents, quantity } from '../format';
 import { ITEM_TYPES } from '../../../shared/orderRules.js';
-import { parsePriceCents } from './MenuTab';
 
 /** Adds a Seasonal menu item together with its recipe, so inventory usage is tracked from the first sale. */
 export default function SeasonalItemDialog({ onClose, onSaved }) {
