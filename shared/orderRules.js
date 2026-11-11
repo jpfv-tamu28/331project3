@@ -11,11 +11,10 @@ export const SIZES = [
   { value: 'L', label: 'Large' },
 ];
 
-export const LEVELS = ['0%', '50%', '100%'];
-// Sugar only: offered as a separate toggle rather than a regular level.
-export const EXTRA_SWEET = '200%';
-export const ICE_LEVELS = LEVELS;
-export const SUGAR_LEVELS = [...LEVELS, EXTRA_SWEET];
+// Both go in 25% steps: ice tops out at 100%, sugar at 150%.
+const percentSteps = (max) => Array.from({ length: max / 25 + 1 }, (_, i) => `${i * 25}%`);
+export const ICE_LEVELS = percentSteps(100); // 0%, 25%, 50%, 75%, 100%
+export const SUGAR_LEVELS = percentSteps(150); // 0% … 150%
 
 export const MAX_TOPPING_COUNT = 5;
 export const MAX_QUANTITY = 99;

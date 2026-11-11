@@ -5,7 +5,8 @@ import { DataTable } from '../components/DataTable';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { DateRangeToolbar, useDateRange } from './DateRange';
+import { DateRangeToolbar } from './DateRange';
+import { useDateRange } from './useDateRange';
 
 /** Pick a report and a date range, then run it (Reports.java). */
 export default function ReportsTab() {

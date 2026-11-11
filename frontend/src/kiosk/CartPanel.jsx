@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Segmented } from '../components/Segmented';
 import { Stepper } from '../components/Stepper';
-import { money } from '../format';
-import { MAX_QUANTITY, PAYMENT_METHODS, SIZES } from '../../../shared/orderRules.js';
+import { money, percent } from '../format';
+import { MAX_QUANTITY, PAYMENT_METHODS, SIZES, TAX_RATE } from '../../../shared/orderRules.js';
 import { customizationSummary, lineCents } from '../cashier/order';
 import DrinkArt from './DrinkArt';
 
@@ -81,7 +81,7 @@ export default function CartPanel({
       <footer className="kiosk-cart-footer">
         <dl className="totals">
           <div><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div>
-          <div><dt>Tax (8.25%)</dt><dd>{money(totals.tax)}</dd></div>
+          <div><dt>Tax ({percent(TAX_RATE)})</dt><dd>{money(totals.tax)}</dd></div>
           <div className="grand"><dt>Total</dt><dd>{money(totals.total)}</dd></div>
         </dl>
         <div>

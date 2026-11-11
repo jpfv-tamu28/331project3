@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Api, errorMessage } from './api';
+import { useAuth } from './components/AuthProvider';
 import { Modal } from './components/Modal';
 import { StateMessage } from './components/StateMessage';
 import { useResource } from './components/useResource';
 import { useToast } from './components/ToastProvider';
-import { money } from './format';
+import { money, percent } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import OrderHistoryDialog from './cashier/OrderHistoryDialog';
 import { customizationSummary, lineCents, orderTotals, toOrderRequest } from './cashier/order';
-import { PAYMENT_METHODS } from '../../shared/orderRules.js';
+import { PAYMENT_METHODS, TAX_RATE } from '../../shared/orderRules.js';
 import './Cashier.css';
 
 
@@ -16,6 +17,7 @@ const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
 
 export default function Cashier() {
   const toast = useToast();
+  const { user, logout } = useAuth();
   const menu = useResource(() => Api.menu({ availableOnly: true }), []);
 
   const [query, setQuery] = useState('');
@@ -118,6 +120,14 @@ export default function Cashier() {
         <button type="button" className="nav-item" onClick={() => setDialog('settings')}>
           Settings
         </button>
+        {user && (
+          <div className="nav-account">
+            <span className="nav-account-name" title={user.email}>{user.name}</span>
+            <button type="button" className="nav-item" onClick={logout}>
+              Sign Out
+            </button>
+          </div>
+        )}
       </nav>
 
       <section className="cashier-menu" aria-label="Menu">
@@ -212,7 +222,7 @@ export default function Cashier() {
         <div className="order-footer">
           <dl className="totals">
             <div><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div>
-            <div><dt>Taxes (8.25%)</dt><dd>{money(totals.tax)}</dd></div>
+            <div><dt>Taxes ({percent(TAX_RATE)})</dt><dd>{money(totals.tax)}</dd></div>
             <div><dt>Discounts</dt><dd>-{money(totals.discount)}</dd></div>
             <div className="grand"><dt>Total</dt><dd>{money(totals.total)}</dd></div>
           </dl>
@@ -271,6 +281,7 @@ export default function Cashier() {
       {dialog === 'settings' && (
         <Modal title="Settings" onClose={() => setDialog(null)}>
           <p>Boba Bops POS System v1.0</p>
+          {user && <p className="subtle" style={{ marginTop: 8 }}>Signed in as {user.name} ({user.email})</p>}
         </Modal>
       )}
       {dialog === 'clear' && (
