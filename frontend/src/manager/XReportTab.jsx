@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { DataTable } from '../components/DataTable';
 import { StatTiles } from '../components/StatTiles';
@@ -14,23 +14,27 @@ const COLUMNS = [
 ];
 
 /** Hourly sales snapshot for one day, today by default. Read-only: running it doesn't reset anything. */
-export default function XReportTab() {
+export default function XReportTab({ refreshKey }) {
   const toast = useToast();
   const [date, setDate] = useState(isoDate());
   const [report, setReport] = useState(null);
-
-  const run = useCallback(async (day) => {
-    try {
-      const data = await Api.xReport(day);
-      setReport({ ...data, generatedAt: new Date() });
-    } catch (err) {
-      toast.error("Couldn't run the X-Report", errorMessage(err));
-    }
-  }, [toast]);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    run(date);
-  }, [date, run]);
+    let cancelled = false;
+    Api.xReport(date)
+      .then((data) => {
+        if (!cancelled) setReport({ ...data, generatedAt: new Date() });
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error("Couldn't run the X-Report", errorMessage(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date, tick, refreshKey, toast]);
+
+  const rerun = () => setTick((t) => t + 1);
 
   const hours = (report?.hours ?? []).map((h) => ({ ...h, avgCents: h.orders ? h.revenueCents / h.orders : 0 }));
   // The tiles carry the day's totals, so the table only lists hours.
@@ -45,11 +49,11 @@ export default function XReportTab() {
         <label className="subtle" htmlFor="xreport-date">Date</label>
         <input id="xreport-date" type="date" className="field" value={date} max={isoDate()}
           onChange={(e) => e.target.value && setDate(e.target.value)} />
-        <button type="button" className="btn btn-secondary" onClick={() => (date === isoDate() ? run(date) : setDate(isoDate()))}>
+        <button type="button" className="btn btn-secondary" onClick={() => (date === isoDate() ? rerun() : setDate(isoDate()))}>
           Today
         </button>
         <div className="spacer" />
-        <button type="button" className="btn btn-primary" onClick={() => run(date)}>Run X-Report</button>
+        <button type="button" className="btn btn-primary" onClick={rerun}>Run X-Report</button>
       </div>
       <div className="xreport-overview">
         <StatTiles tiles={[

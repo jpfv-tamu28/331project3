@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { ChipBar } from '../components/ChipBar';
 import { DataTable } from '../components/DataTable';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { DateRangeToolbar, useDateRange } from './DateRange';
+import { DateRangeToolbar } from './DateRange';
+import { useDateRange } from './useDateRange';
 
 /** Pick a report and a date range, then run it (Reports.java). */
-export default function ReportsTab() {
+export default function ReportsTab({ refreshKey }) {
   const toast = useToast();
   const reports = useResource(() => Api.reportList(), []);
   const [chosen, setChosen] = useState(null);
@@ -35,6 +36,11 @@ export default function ReportsTab() {
     }
   };
 
+  useEffect(() => {
+    if (refreshKey > 0 && result) run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
+  
   if (!reports.data) {
     return <StateMessage loading={reports.loading} error={reports.error} onRetry={reports.reload} />;
   }
