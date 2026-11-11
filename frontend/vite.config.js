@@ -10,6 +10,10 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: {
       '/api': process.env.VITE_API_PROXY || 'http://localhost:3001',
+
+      '/lt': {target: 'http://localhost:5000', rewrite: (path) => path.replace(/^\/lt/, ''),
+    },
     },
   },
 })
+

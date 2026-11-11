@@ -9,6 +9,7 @@ import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
 import CartPanel from './kiosk/CartPanel';
 import DrinkArt, { flavorColor, tint } from './kiosk/DrinkArt';
+import TranslateButton from './components/TranslateButton';
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
@@ -146,6 +147,7 @@ export default function Kiosk() {
       setPlacing(false);
     }
   };
+  
 
   return (
     <main className="kiosk">
@@ -171,6 +173,7 @@ export default function Kiosk() {
           <span className="kiosk-cart-total">{money(totals.total)}</span>
         </button>
         <h1 className="kiosk-brand">Boba Bops</h1>
+        <TranslateButton />
         <p className="kiosk-tagline">Tap a drink to start</p>
       </header>
 

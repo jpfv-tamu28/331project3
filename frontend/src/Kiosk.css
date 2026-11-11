@@ -433,3 +433,10 @@
   font-weight: 800;
   color: var(--text);
 }
+
+.translate-widget { display: inline-flex; align-items: center; gap: 0.5rem; }
+.translate-widget select { padding: 0.4rem 0.6rem; border-radius: 8px; font: inherit; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
