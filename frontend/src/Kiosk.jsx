@@ -181,16 +181,18 @@ export default function Kiosk() {
           <span className="kiosk-cart-total">{money(totals.total)}</span>
         </button>
         <h1 className="kiosk-brand">Boba Bops</h1>
-        <TranslateButton />
-        <button
-          type="button"
-          className="kiosk-icon-btn kiosk-settings-btn"
-          aria-haspopup="dialog"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <img src={gearIcon} alt="" />
-          <span className="sr-only">Settings</span>
-        </button>
+        <div className="kiosk-header-actions">
+          <TranslateButton />
+          <button
+            type="button"
+            className="kiosk-icon-btn kiosk-settings-btn"
+            aria-haspopup="dialog"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <img src={gearIcon} alt="" />
+            <span className="sr-only">Settings</span>
+          </button>
+        </div>
       </header>
 
       <nav className="kiosk-tabs" aria-label="Menu sections">
