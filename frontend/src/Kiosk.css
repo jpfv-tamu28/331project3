@@ -95,8 +95,10 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--surface);
+  background: #000;
   font-size: calc(16px * var(--kiosk-text, 1));
+  position: relative;
+  background: #000;
 }
 
 /* ---------- Header ---------- */
@@ -200,6 +202,8 @@
   overflow-x: auto;
   scrollbar-width: none;
   border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 1;
 }
 
 .kiosk-tab {
@@ -240,6 +244,8 @@
   overflow-y: hidden;
   scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
+  position: relative;
+  z-index: 1;
 }
 
 .kiosk-track:focus-visible {
@@ -250,6 +256,7 @@
   flex: none;
   scroll-snap-align: start;
   scroll-margin-left: 24px;
+
 }
 
 .kiosk-section h2 {
@@ -257,6 +264,7 @@
   font-size: calc(26px * var(--kiosk-text, 1));
   font-weight: 800;
   letter-spacing: -0.01em;
+  color: #fff;
 }
 
 .kiosk-grid {
@@ -278,11 +286,11 @@
   padding: 14px 16px 16px;
   border: 0;
   border-radius: 20px;
-  /* The drink's flavor color washed toward the background (white in light mode, as before). */
-  background: color-mix(in srgb, var(--tile-color, #c9a27e) var(--tile-mix, 20%), var(--tile-base, #fff));
-  color: var(--text);
+  background: #000;
+  color: #fff;
   text-align: left;
   transition: transform 0.12s, box-shadow 0.12s;
+  
 }
 
 .kiosk-tile:hover {
@@ -316,11 +324,12 @@
   margin-top: 2px;
   font-size: calc(clamp(12px, calc(var(--tile) / 20), 14px) * var(--kiosk-text, 1));
   line-height: 1.25;
-  color: var(--subtle);
+  color: #cdc5bb;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  
 }
 
 .kiosk-tile-price {
@@ -338,7 +347,7 @@
   display: flex;
   flex-direction: column;
   width: min(420px, 90vw);
-  background: var(--surface);
+  background: #000;
   border-right: 1px solid var(--line);
   box-shadow: 16px 0 40px -24px rgb(31 29 27 / 0.45);
   transform: translateX(-105%);
@@ -358,12 +367,14 @@
   justify-content: space-between;
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
+  color: #fff;
 }
 
 .kiosk-cart-header h2 {
   font-size: calc(22px * var(--kiosk-text, 1));
   font-weight: 800;
   outline: none;
+  color: #fff;
 }
 
 .kiosk-icon-btn {
@@ -643,4 +654,114 @@
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ---------- Intro: boba pour + floating ---------- */
+.kiosk-intro .kiosk-grid > li {
+  will-change: transform;
+}
+
+/* The tea stays as the menu's background after the pour. */
+/* The tea fills everything below the header, tabs included, and stays as the background. */
+.kiosk-liquid {
+  position: absolute;
+  top: var(--kiosk-header);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0; /* behind the tabs and tiles (1), below the cart panel (10) */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kiosk-liquid-fill {
+  --liquid-top: #8a5a3c; /* solid tea; also used by the wavy surface */
+  position: absolute;
+  inset: 20px 0 0;
+  background: var(--liquid-top);
+  transform: translateY(calc(100% + 20px));
+  animation: kiosk-pour 2.6s cubic-bezier(0.35, 0.1, 0.3, 1) forwards;
+}
+
+:root[data-kiosk-theme='contrast'] .kiosk-liquid-fill {
+  --liquid-top: #000;
+  --liquid-bottom: #000;
+}
+
+/* Wavy surface riding on top of the liquid. */
+.kiosk-liquid-fill::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -19px;
+  height: 20px;
+  background: var(--liquid-top);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 20' preserveAspectRatio='none'><path d='M0 20V10Q20 0 40 10T80 10V20Z'/></svg>") repeat-x 0 0 / 80px 20px;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 20' preserveAspectRatio='none'><path d='M0 20V10Q20 0 40 10T80 10V20Z'/></svg>") repeat-x 0 0 / 80px 20px;
+  animation: kiosk-wave 1.2s linear infinite;
+}
+
+@keyframes kiosk-pour {
+  to { transform: translateY(0); }
+}
+
+@keyframes kiosk-wave {
+  to {
+    -webkit-mask-position: 80px 0;
+    mask-position: 80px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-liquid-fill {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* Once settled, every tile drifts a little, like objects suspended in liquid. */
+.kiosk:not(.kiosk-intro) .kiosk-grid > li {
+  animation: kiosk-bob var(--bob-d, 4.4s) ease-in-out var(--bob-delay, 0s) infinite;
+}
+
+.kiosk-grid > li:nth-child(5n + 1) { --bob-d: 4.2s; --bob-delay: -0.4s; }
+.kiosk-grid > li:nth-child(5n + 2) { --bob-d: 5.1s; --bob-delay: -2.1s; }
+.kiosk-grid > li:nth-child(5n + 3) { --bob-d: 4.7s; --bob-delay: -1.3s; }
+.kiosk-grid > li:nth-child(5n + 4) { --bob-d: 5.6s; --bob-delay: -3.2s; }
+.kiosk-grid > li:nth-child(5n + 5) { --bob-d: 3.9s; --bob-delay: -0.9s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk .kiosk-grid > li {
+    animation: none;
+  }
+}
+/* Uses the individual `translate`/`rotate` properties so it never fights the tile's own transform. */
+@keyframes kiosk-bob {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  25%      { translate: 2px -3px; rotate: -0.5deg; }
+  50%      { translate: 0 -6px; rotate: 0.6deg; }
+  75%      { translate: -2px -3px; rotate: 0.3deg; }
+}
+
+.kiosk-header,
+.kiosk-brand,
+.kiosk-tab,
+.kiosk-tab:hover,
+.kiosk-tab[aria-current='true'] {
+  color: #fff;
+}
+
+.kiosk-cart-toggle {
+  background: #fff;
+  border-color: #000;
+  color: #000;
+}
+
+.kiosk-cart-toggle:hover {
+  background: #262626;
+}
+
+.kiosk-cart-badge {
+  border-color: #000;
 }

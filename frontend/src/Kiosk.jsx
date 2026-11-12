@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Api, errorMessage } from './api';
 import { Modal } from './components/Modal';
 import { StateMessage } from './components/StateMessage';
@@ -15,6 +15,7 @@ import SettingsDialog from './kiosk/SettingsDialog';
 import { useKioskSettings } from './kiosk/useKioskSettings';
 import gearIcon from './assets/gear.png';
 import TranslateButton from './components/TranslateButton';
+
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
@@ -48,6 +49,8 @@ export default function Kiosk() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const trackRef = useRef(null);
   const tabRefs = useRef({});
+  const [intro, setIntro] = useState(true);
+  const introPlayed = useRef(false);
 
   const items = useMemo(() => menu.data ?? [], [menu.data]);
   const toppings = useMemo(() => items.filter(isTopping), [items]);
@@ -61,6 +64,62 @@ export default function Kiosk() {
     }
     return [...map.entries()].map(([category, drinks]) => ({ category, drinks }));
   }, [items]);
+
+  // Intro: in each column, tiles start stacked flush on the bottom edge (bottom tile on the floor,
+  // the next one resting on top of it). Only the y position animates; x and rotation never change.
+  useLayoutEffect(() => {
+    if (introPlayed.current || !menu.data || sections.length === 0) return;
+    introPlayed.current = true;
+
+    const track = trackRef.current;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!track || reduceMotion || !track.animate) {
+      setIntro(false);
+      return;
+    }
+
+    const view = track.getBoundingClientRect();
+    const tiles = [...track.querySelectorAll('.kiosk-grid > li')];
+    if (tiles.length === 0) {
+      setIntro(false);
+      return;
+    }
+
+    // Group tiles by column (same left edge), then stack each column from the bottom up.
+    const columns = new Map();
+    for (const li of tiles) {
+      const r = li.getBoundingClientRect();
+      const key = Math.round(r.left + track.scrollLeft);
+      if (!columns.has(key)) columns.set(key, []);
+      columns.get(key).push({ li, r });
+    }
+
+    const anims = [];
+    for (const column of columns.values()) {
+      column.sort((a, b) => b.r.bottom - a.r.bottom); // lowest tile first
+      // One timing per column, so the tiles in it rise as a single stack and never overlap.
+      const delay = 500 + Math.random() * 250;
+      const duration = 1700 + Math.random() * 200;
+      let floor = view.bottom; // the bottom of the page, then the top of the tile beneath
+      for (const { li, r } of column) {
+        const dy = floor - r.bottom; // how far down this tile starts from its grid spot
+        floor -= r.height;
+        anims.push(
+          li.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }], {
+            delay,
+            duration,
+            easing: 'cubic-bezier(0.22, 1.2, 0.36, 1)', // slight overshoot, like buoyancy
+            fill: 'both',
+          }),
+        );
+      }
+    }
+
+    Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(() => {
+      anims.forEach((a) => a.cancel());
+      setIntro(false);
+    });
+  }, [menu.data, sections]);
 
   const totals = orderTotals(lines);
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);
@@ -158,7 +217,7 @@ export default function Kiosk() {
   
 
   return (
-    <main className="kiosk">
+    <main className={`kiosk${intro ? ' kiosk-intro' : ''}`}>
       <header className="kiosk-header">
         <button
           type="button"
@@ -192,6 +251,12 @@ export default function Kiosk() {
           <span className="sr-only">Settings</span>
         </button>
       </header>
+
+      {menu.data && (
+        <div className="kiosk-liquid" aria-hidden="true">
+          <div className="kiosk-liquid-fill" />
+        </div>
+      )}
 
       <nav className="kiosk-tabs" aria-label="Menu sections">
         {sections.map(({ category }) => (
