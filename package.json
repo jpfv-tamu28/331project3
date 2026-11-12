@@ -5,7 +5,8 @@
   "description": "Boba Bops POS: run npm scripts from here to work on both the API and the React app.",
   "scripts": {
     "postinstall": "npm --prefix backend install && npm --prefix frontend install",
-    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev": "concurrently -n api,web,lt -c yellow,cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\" \"npm run dev:lt\"",
+    "dev:lt": "${LT_BIN:-libretranslate} --load-only en,es,fr,de || echo 'LibreTranslate not found, translation disabled'",
     "build": "npm --prefix frontend run build",
     "test": "npm --prefix backend test",
     "start": "node backend/src/server.js"
