@@ -115,6 +115,24 @@ export function priceOrder(lines, menuRows, discount = null) {
   return { priced, subtotalCents, taxCents, discountCents, totalCents };
 }
 
+// Subtracts each ordered item's recipe ingredients from inventory (clamped at 0).
+export async function deductOrderInventory(client, orderId) {
+  await client.query(
+    `UPDATE inventory i
+     SET quantity_on_hand = GREATEST(0, i.quantity_on_hand - used.amount),
+         updated_at = NOW()
+     FROM (
+       SELECT r.inventory_id, SUM(oi.quantity * r.quantity_required) AS amount
+       FROM order_items oi
+       JOIN recipes r ON r.menu_item_id = oi.menu_item_id
+       WHERE oi.order_id = $1
+       GROUP BY r.inventory_id
+     ) used
+     WHERE i.inventory_id = used.inventory_id`,
+    [orderId],
+  );
+}
+
 export function createOrderRoutes({ db = pool, runTransaction = withTransaction } = {}) {
   const router = Router();
 
@@ -272,6 +290,7 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
             [orderId, t.item.id, parentId, t.item.name, t.count * line.quantity, t.item.priceCents]);
         }
       }
+      await deductOrderInventory(client, orderId);
       return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
     });
 
