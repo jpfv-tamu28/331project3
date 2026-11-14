@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Api, errorMessage, googleLoginUrl } from '../api';
 import { useToast } from './ToastProvider';
 import { useResource } from './useResource';
@@ -55,11 +55,10 @@ export function AuthProvider({ children }) {
       await Api.logout();
       setLoggedOut(true);
       toast.info('Signed out', 'You have been signed out.');
-      navigate('/', { replace: true });
     } catch (err) {
       toast.error('Could not sign out', errorMessage(err));
     }
-  }, [navigate, toast]);
+  }, [toast]);
 
   const user = loggedOut ? null : (session.data?.user ?? null);
   const configured = session.data ? session.data.configured !== false : true;
@@ -156,12 +155,6 @@ export function RequireAuth({ title, children }) {
             <GoogleIcon />
             <span>Sign in with Google</span>
           </button>
-
-          <div className="auth-footer">
-            <Link to="/" replace className="auth-back-link">
-              ← Back to Portal
-            </Link>
-          </div>
         </section>
       </main>
     );
