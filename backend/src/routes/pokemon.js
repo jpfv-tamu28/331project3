@@ -3,8 +3,16 @@ import { HttpError, asyncRoute, requireId } from '../http.js';
 
 export const DEX_SIZE = 1025;
 
-/** Wraps any positive number onto dex numbers 1..DEX_SIZE, so order #1026 gets #1 again. */
-export const dexNumber = (n) => ((n - 1) % DEX_SIZE) + 1;
+/**
+ * Maps a positive order number to a Pokedex number (1..DEX_SIZE) matching its trailing digits:
+ * - If the last 4 digits are 1..1025 (e.g. #25 -> #025, #1025 -> #1025, #21015 -> #1015), use them.
+ * - Otherwise use the last 3 digits (001..999 -> #001..#999, and 000 -> #1000).
+ */
+export const dexNumber = (n) => {
+  const last4 = n % 10000;
+  if (last4 >= 1 && last4 <= DEX_SIZE) return last4;
+  return n % 1000 || 1000;
+};
 
 /** Keeps only the fields the kiosk shows from a PokeAPI /pokemon response. */
 export function toPokemon(data) {
