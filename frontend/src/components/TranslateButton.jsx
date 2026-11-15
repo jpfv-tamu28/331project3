@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import globeIcon from '../assets/translate_icon.png';
 
 const API = import.meta.env.VITE_LT_URL ?? '/lt';
 const SOURCE = 'en';
@@ -166,7 +167,7 @@ export default function TranslateButton() {
   return (
     <div ref={widgetRef} className="translate-widget" translate="no">
       <label>
-        <span aria-hidden="true">🌐</span>
+        <img src={globeIcon} alt="" className="translate-icon" />
         <span className="visually-hidden">Language</span>
         <select
           value={lang}
