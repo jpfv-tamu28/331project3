@@ -58,6 +58,7 @@ export const Api = {
   weather: (zip) => api.get('/weather', { params: zip ? { zip } : {} }).then((r) => r.data),
   weatherSuggestions: () => api.get('/weather/suggestions').then((r) => r.data),
   pokemon: (id) => api.get(`/pokemon/${id}`).then((r) => r.data),
+  rewards: (phone) => api.get(`/rewards/${phone}`).then((r) => r.data),
   
 
   productUsage: (from, to) => api.get('/reports/product-usage', { params: { from, to } }).then((r) => r.data),

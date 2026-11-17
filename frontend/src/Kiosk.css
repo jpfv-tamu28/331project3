@@ -523,6 +523,48 @@
   border-top: 1px solid var(--line);
 }
 
+.kiosk-rewards-row {
+  display: flex;
+  gap: 8px;
+}
+
+.kiosk-rewards-row .field {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  font-size: calc(15px * var(--kiosk-text, 1));
+}
+
+.kiosk-rewards-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+.kiosk-rewards-redeem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kiosk-rewards-hint {
+  font-weight: 400;
+  color: var(--subtle);
+}
+
+.kiosk-rewards-error {
+  margin-top: 6px;
+  color: var(--error);
+}
+
+.kiosk-done-points {
+  font-weight: 700;
+}
+
 .kiosk-cart-label {
   margin-bottom: 6px;
   font-size: calc(13px * var(--kiosk-text, 1));

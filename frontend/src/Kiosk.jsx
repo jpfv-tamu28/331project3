@@ -7,6 +7,7 @@ import { useToast } from './components/ToastProvider';
 import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
+import { REWARD_CENTS, maxRewards, normalizePhone } from '../../shared/orderRules.js';
 import CartPanel from './kiosk/CartPanel';
 import DrinkArt from './kiosk/DrinkArt';
 import OrderBuddy from './kiosk/OrderBuddy';
@@ -46,6 +47,9 @@ export default function Kiosk() {
   const [payment, setPayment] = useState('card');
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(null); // order returned by the server
+  const [rewardPhone, setRewardPhone] = useState('');
+  const [rewardPoints, setRewardPoints] = useState(null); // balance once looked up
+  const [redeem, setRedeem] = useState(0); // $1 rewards the customer chose to use
   const [activeSection, setActiveSection] = useState(null);
   const [bump, setBump] = useState(0); // restarts the cart badge animation on every add
   const [settings, updateSettings] = useKioskSettings();
@@ -129,7 +133,11 @@ export default function Kiosk() {
     });
   }, [menu.data, suggestions.loading, sections]);
 
-  const totals = orderTotals(lines);
+  const baseTotals = orderTotals(lines);
+  const maxRedeem = rewardPoints === null ? 0 : maxRewards(rewardPoints, baseTotals.total);
+  const redeemCount = Math.min(redeem, maxRedeem); // the cart may have shrunk since it was chosen
+  const rewardCents = redeemCount * REWARD_CENTS;
+  const totals = { ...baseTotals, reward: rewardCents, total: baseTotals.total - rewardCents };
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);
   const current = activeSection ?? sections[0]?.category;
 
@@ -201,6 +209,9 @@ export default function Kiosk() {
     setPlaced(null);
     setCartOpen(false);
     setPayment('card');
+    setRewardPhone('');
+    setRewardPoints(null);
+    setRedeem(0);
     trackRef.current?.scrollTo({ left: 0 });
     setActiveSection(null);
   }, []);
@@ -214,7 +225,12 @@ export default function Kiosk() {
   const placeOrder = async () => {
     setPlacing(true);
     try {
-      const order = await Api.createOrder({ items: toOrderRequest(lines), paymentMethod: payment });
+      const order = await Api.createOrder({
+        items: toOrderRequest(lines),
+        paymentMethod: payment,
+        rewardPhone: normalizePhone(rewardPhone),
+        redeemRewards: redeemCount,
+      });
       setPlaced(order);
     } catch (err) {
       toast.error("We couldn't place your order", errorMessage(err));
@@ -297,6 +313,15 @@ export default function Kiosk() {
           onRemove={(index) => setLines((list) => list.filter((_, i) => i !== index))}
           onPlaceOrder={placeOrder}
           placing={placing}
+          rewards={{
+            phone: rewardPhone,
+            onPhoneChange: (value) => { setRewardPhone(value); setRewardPoints(null); setRedeem(0); },
+            points: rewardPoints,
+            onPoints: setRewardPoints,
+            redeem: redeemCount,
+            maxRedeem,
+            onRedeem: setRedeem,
+          }}
         />
 
         {menu.data ? (
@@ -373,6 +398,13 @@ export default function Kiosk() {
             {PAYMENT_NOTES[payment]}
           </p>
           <p>We'll call your number when your drinks are ready.</p>
+          {placed.pointsBalance != null && (
+            <p className="kiosk-done-points">
+              You earned {placed.pointsEarned.toLocaleString()} points
+              {placed.rewardCents > 0 && ` and saved ${money(placed.rewardCents)}`}.
+              {' '}Balance: {placed.pointsBalance.toLocaleString()} points.
+            </p>
+          )}
           <OrderBuddy orderId={placed.id} />
         </Modal>
       )}
