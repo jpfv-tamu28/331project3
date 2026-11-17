@@ -303,6 +303,43 @@
   
 }
 
+/* Fills the empty fourth slot in the Today's Picks grid (the route returns at most 3 drinks). */
+.kiosk-picks-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.kiosk-picks-icon {
+  width: 56px;
+  height: 56px;
+  color: var(--accent);
+}
+
+.kiosk-picks-temp {
+  font-size: calc(32px * var(--kiosk-text, 1));
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.kiosk-picks-condition {
+  font-size: calc(14px * var(--kiosk-text, 1));
+  color: var(--muted);
+}
+
+.kiosk-picks-reason {
+  margin-top: 6px;
+  font-size: calc(16px * var(--kiosk-text, 1));
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 .kiosk-tile:hover {
   box-shadow: 0 10px 24px -14px rgb(31 29 27 / 0.45);
 }
