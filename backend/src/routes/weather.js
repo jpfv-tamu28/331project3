@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { pool } from '../db.js';
 import { HttpError, asyncRoute } from '../http.js';
 
 // The kiosk always shows the weather for the store's zip code.
@@ -98,27 +99,66 @@ async function fromOpenMeteo() {
 const SOURCES = [['nws', fromNws], ['open-meteo', fromOpenMeteo]];
 let cached = null; // { at, data }
 
-const router = Router();
-
-// GET /api/weather -> { zip, place, temperatureF, icon, condition, isDay, observedAt, source }
-router.get('/', asyncRoute(async (_req, res) => {
-  if (cached && Date.now() - cached.at < WEATHER_TTL_MS) {
-    res.json(cached.data);
-    return;
-  }
+async function getWeather() {
+  if (cached && Date.now() - cached.at < WEATHER_TTL_MS) return cached.data;
   for (const [source, load] of SOURCES) {
     try {
       const data = { zip: ZIP, place: PLACE, ...(await load()), source };
       cached = { at: Date.now(), data };
-      res.json(data);
-      return;
+      return data;
     } catch (err) {
       console.error(`[WARN] Weather lookup failed (${source}):`, err.message);
     }
   }
   // Every source failed: the last reading is better than nothing.
   if (!cached) throw new HttpError(502, 'The weather service is unavailable right now.');
-  res.json(cached.data);
+  return cached.data;
+}
+
+const HOT_F = 85;
+const COLD_F = 60;
+const GLOOMY = ['rain', 'drizzle', 'thunderstorm', 'snow', 'fog'];
+
+/** Picks the menu categories to suggest for the weather, best fit first. */
+export function suggestCategories({ temperatureF, icon }) {
+  if (GLOOMY.includes(icon) || temperatureF < COLD_F) {
+    return { reason: 'Cozy up with something creamy', categories: ['Milk Tea', 'Specialty'] };
+  }
+  if (temperatureF >= HOT_F) {
+    return { reason: 'Beat the heat with something icy', categories: ['Slush', 'Fruit/Clear Tea'] };
+  }
+  return { reason: 'A light, fruity pick for a nice day', categories: ['Fruit/Clear Tea', 'Milk Tea'] };
+}
+
+const SUGGESTION_COUNT = 3;
+
+const router = Router();
+
+// GET /api/weather -> { zip, place, temperatureF, icon, condition, isDay, observedAt, source }
+router.get('/', asyncRoute(async (_req, res) => {
+  res.json(await getWeather());
+}));
+
+// GET /api/weather/suggestions -> { weather, reason, items: [{ id, name, category, description, priceCents }] }
+// A weather outage only hides the suggestions, so it answers with an empty list instead of an error.
+router.get('/suggestions', asyncRoute(async (_req, res) => {
+  let weather;
+  try {
+    weather = await getWeather();
+  } catch {
+    res.json({ weather: null, reason: null, items: [] });
+    return;
+  }
+  const { reason, categories } = suggestCategories(weather);
+  const { rows } = await pool.query(
+    `SELECT menu_item_id AS id, name, category, description, price_cents AS "priceCents"
+     FROM menu_items
+     WHERE is_available AND item_type = 'drink' AND category = ANY($1)
+     ORDER BY array_position($1, category), name
+     LIMIT $2`,
+    [categories, SUGGESTION_COUNT],
+  );
+  res.json({ weather, reason, items: rows });
 }));
 
 export default router;
