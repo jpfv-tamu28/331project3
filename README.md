@@ -78,6 +78,7 @@ All routes are under `/api`. Errors come back as `{ "error": "message" }`.
 | POST | `/inventory/restock` | `{ items: [{ id, amount }] }` adds each amount to on hand (never overwrites, so concurrent sales aren't lost); all-or-nothing; returns the updated ingredients (requires OAuth) |
 | GET / POST / PUT | `/employees`, `/employees/:id` | `{ name, role, pin, isActive }`; PINs are never returned (requires OAuth) |
 | GET | `/orders?limit=100` | most recent first (requires OAuth) |
+| GET | `/orders/events` | Server-Sent Events stream: an `order` event (`{ id }`) the moment any order commits (Postgres `NOTIFY`, so it works across API instances); manager reports refresh on it (requires OAuth) |
 | GET | `/orders/:id/items` | lines of one order; add-ons carry `parentId` (requires OAuth) |
 | GET / POST | `/orders/discounts` | list all discount codes or create a new one (requires OAuth) |
 | GET | `/orders/discounts/:code` | validates a discount code |

@@ -18,6 +18,11 @@ export function errorMessage(err) {
   return 'Could not reach the server. Check your connection and try again.';
 }
 
+/** Absolute-or-relative URL of an API path, for things axios doesn't handle (e.g. EventSource). */
+export function apiUrl(path) {
+  return `${API_BASE.replace(/\/+$/, '')}${path}`;
+}
+
 /** Builds the full URL that starts the Google OAuth 2.0 redirect flow. */
 export function googleLoginUrl(returnTo = '/') {
   const base = API_BASE.replace(/\/+$/, '');

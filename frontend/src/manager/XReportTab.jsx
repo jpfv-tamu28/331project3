@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { DataTable } from '../components/DataTable';
 import { StatTiles } from '../components/StatTiles';
-import { AUTO_REFRESH_MS, useAutoRefresh } from '../components/useAutoRefresh';
+import { useAutoRefresh } from '../components/useAutoRefresh';
 import { useToast } from '../components/ToastProvider';
 import { hourLabel, isoDate, longDate, money } from '../format';
 
@@ -76,7 +76,7 @@ export default function XReportTab({ refreshKey, active = true }) {
           {report && (orders === 0
             ? `No sales recorded for ${longDate(report.date)}. Generated ${generated}`
             : `X-Report for ${longDate(report.date)}. Generated ${generated}`)}
-          {report && live && ` · Updates every ${AUTO_REFRESH_MS / 1000} seconds`}
+          {report && live && ' · Updates automatically as orders come in'}
         </p>
       </div>
       <div className="panel-fill table-wrap">

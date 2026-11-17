@@ -74,6 +74,7 @@ describe('POST /api/orders with a rewards email', () => {
         if (sql.includes('FROM reward_accounts')) return { rows: [{ id: 5, points: 1200 }] };
         if (sql.startsWith('UPDATE reward_accounts')) return { rows: [{ points: 1200 - params[1] + params[2] }] };
         if (sql.startsWith('LOCK TABLE') || sql.startsWith('UPDATE inventory')) return { rows: [] };
+        if (sql.includes('pg_notify')) return { rows: [] };
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 7 }] };
         if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 70 }] };
         if (sql.includes('FROM order_items WHERE order_id')) {

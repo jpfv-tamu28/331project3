@@ -398,6 +398,7 @@ describe('orders HTTP routes', () => {
           recordedInserts.push({ table: 'inventory', params });
           return { rowCount: 1 };
         }
+        if (sql.includes('pg_notify')) return { rows: [] };
         throw new Error(`Unexpected SQL in test: ${sql}`);
       },
     };

@@ -15,7 +15,8 @@ if (!/^[A-Za-z0-9_+\-/]+$/.test(SHOP_TIMEZONE)) {
   throw new Error(`SHOP_TIMEZONE "${SHOP_TIMEZONE}" is not a valid time zone name.`);
 }
 
-export const pool = new pg.Pool({
+/** Settings for one connection; the pool and the order-notification listener (orderEvents.js) share them. */
+export const connectionConfig = {
   options: `-c TimeZone=${SHOP_TIMEZONE}`,
   host: process.env.DB_HOST || 'csce-315-db.engr.tamu.edu',
   port: Number(process.env.DB_PORT || 5432),
@@ -25,9 +26,13 @@ export const pool = new pg.Pool({
   // The TAMU server only accepts encrypted connections from off-campus addresses (the Java
   // driver negotiated SSL on its own; node-pg doesn't). Set DB_SSL=false for a local database.
   ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10_000,
+};
+
+export const pool = new pg.Pool({
+  ...connectionConfig,
   max: Number(process.env.DB_POOL_MAX || 10),
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
 });
 
 pool.on('error', (err) => {

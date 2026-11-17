@@ -3,6 +3,7 @@ import { pool, withTransaction } from '../db.js';
 import { asyncRoute, HttpError, requireId } from '../http.js';
 import { claimRewardAccount, requireEmail } from './rewards.js';
 import { escapeHtml, sendEmail } from '../email.js';
+import { notifyOrderPlaced, orderEventStream } from '../orderEvents.js';
 import {
   ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, POINTS_PER_REWARD, REWARD_CENTS, SIZES,
   SUGAR_LEVELS, TAX_RATE, pointsForPayment, sizedPriceCents,
@@ -189,7 +190,9 @@ async function emailReceipt(db, order, email) {
   await sendEmail({ to: email, subject: `Your Boba Bops receipt (order #${order.id})`, html: receiptHtml(order, items) });
 }
 
-export function createOrderRoutes({ db = pool, runTransaction = withTransaction } = {}) {
+export function createOrderRoutes({
+  db = pool, runTransaction = withTransaction, notifyPlaced = notifyOrderPlaced, eventStream = orderEventStream(),
+} = {}) {
   const router = Router();
 
   // GET /api/orders/discounts/:code -> { code, type, value, rate, minOrderCents, label } or 404
@@ -291,6 +294,10 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
     res.json(rows);
   }));
 
+  // GET /api/orders/events -> Server-Sent Events: "order" { id } as soon as any order commits,
+  // so manager reports refresh right away instead of on their next poll (requires OAuth).
+  router.get('/events', eventStream);
+
   // GET /api/orders/:id/items -> lines of one order, toppings after the drink they belong to
   router.get('/:id/items', asyncRoute(async (req, res) => {
     const id = requireId(req.params.id, 'Order ID');
@@ -371,6 +378,8 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
         }
       }
       await deductOrderInventory(client, orderId);
+      // Delivered by Postgres only when this transaction commits.
+      await notifyPlaced(client, orderId);
       return {
         id: orderId, subtotalCents, taxCents, discountCents, rewardCents, totalCents, paymentMethod: paymentKey,
         pointsEarned, pointsRedeemed, pointsBalance,
