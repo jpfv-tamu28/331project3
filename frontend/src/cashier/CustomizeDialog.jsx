@@ -8,6 +8,9 @@ import {
 } from '../../../shared/orderRules.js';
 import { lineCents } from './order';
 
+// Boba is the add-on customers look for first (user study), so it leads the list.
+const isBoba = (t) => /boba|tapioca/i.test(t.name);
+
 /**
  * Size / ice / sugar / add-ons / quantity for one drink (Cashier.openCustomizationDialog).
  * existing is the order line being edited, or null to add a new one.
@@ -23,6 +26,8 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
     toppings.map((t) => [t.id, existing?.toppings.find((x) => x.item.id === t.id)?.count ?? 0]),
   ));
 
+  const sortedToppings = useMemo(() => [...toppings].sort((a, b) => isBoba(b) - isBoba(a)), [toppings]);
+
   const line = useMemo(() => ({
     item,
     size,
@@ -35,11 +40,13 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
   return (
     <Modal
       title={item.name}
+      headerAction={existing && <span className="badge badge-editing">Editing your drink</span>}
+      tone={existing ? 'accent' : undefined}
       submitLabel={existing ? 'Save Changes' : 'Add to Order'}
       onSubmit={() => onSave(line)}
       onClose={onClose}
       width={width}
-      className={className}
+      className={`${className ?? ''} customize-dialog`.trim()}
     >
       <div className="customize">
         <div className="customize-intro">
@@ -66,7 +73,7 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
           <fieldset>
             <legend>Add-Ons</legend>
             <ul className="addons">
-              {toppings.map((t) => {
+              {sortedToppings.map((t) => {
                 const n = counts[t.id];
                 return (
                   <li key={t.id} className={n > 0 ? 'chosen' : undefined}>

@@ -62,14 +62,16 @@ export default function CartPanel({
                         max={MAX_QUANTITY}
                         onChange={(q) => onQuantity(index, q)}
                       />
-                      <button type="button" className="kiosk-link-btn" onClick={() => onEdit(index)}
-                        aria-label={`Edit ${name}`}>
-                        Edit
-                      </button>
-                      <button type="button" className="kiosk-link-btn" onClick={() => onRemove(index)}
-                        aria-label={`Remove ${name}`}>
-                        Remove
-                      </button>
+                      <span className="kiosk-line-btns">
+                        <button type="button" className="kiosk-line-btn" onClick={() => onEdit(index)}
+                          aria-label={`Edit ${name}`}>
+                          <span aria-hidden="true">✎</span> Edit
+                        </button>
+                        <button type="button" className="kiosk-line-btn kiosk-line-btn-remove" onClick={() => onRemove(index)}
+                          aria-label={`Remove ${name}`}>
+                          <span aria-hidden="true">✕</span> Remove
+                        </button>
+                      </span>
                     </div>
                   </div>
                   <span className="kiosk-cart-price">{money(lineCents(line))}</span>
