@@ -30,7 +30,7 @@ export default function RewardsBox({ email, onEmailChange, points, onPoints, red
   return (
     <div className="kiosk-rewards">
       <label className="kiosk-cart-label" htmlFor="kiosk-rewards-email">
-        Email for rewards and receipt: {POINTS_PER_DOLLAR} points per $1, {POINTS_PER_REWARD.toLocaleString()} points = {money(REWARD_CENTS)} off
+        Rewards &amp; receipt
       </label>
       <div className="kiosk-rewards-row">
         <input
@@ -54,6 +54,11 @@ export default function RewardsBox({ email, onEmailChange, points, onPoints, red
       {partial && !error && (
         <p id="kiosk-rewards-partial" className="kiosk-rewards-error">
           Finish your email address, or clear it to order without rewards.
+        </p>
+      )}
+      {points === null && !partial && !error && (
+        <p className="kiosk-rewards-hint kiosk-rewards-info">
+          Earn {POINTS_PER_DOLLAR} points per $1. Every {POINTS_PER_REWARD.toLocaleString()} points is {money(REWARD_CENTS)} off.
         </p>
       )}
       {points !== null && (

@@ -556,6 +556,11 @@
   color: var(--subtle);
 }
 
+.kiosk-rewards-info {
+  margin-top: 6px;
+  font-size: calc(13px * var(--kiosk-text, 1));
+}
+
 .kiosk-rewards-error {
   margin-top: 6px;
   color: var(--error);
