@@ -296,11 +296,49 @@
   padding: 14px 16px 16px;
   border: 0;
   border-radius: 20px;
-  background: #000;
-  color: #fff;
+  /* The drink's flavor color washed toward the theme's background, so tiles follow light/dark/contrast. */
+  background: color-mix(in srgb, var(--tile-color, #c9a27e) var(--tile-mix, 20%), var(--tile-base, #fff));
+  color: var(--text);
   text-align: left;
   transition: transform 0.12s, box-shadow 0.12s;
   
+}
+
+/* Fills the empty fourth slot in the Today's Picks grid (the route returns at most 3 drinks). */
+.kiosk-picks-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.kiosk-picks-icon {
+  width: 56px;
+  height: 56px;
+  color: var(--accent);
+}
+
+.kiosk-picks-temp {
+  font-size: calc(32px * var(--kiosk-text, 1));
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.kiosk-picks-condition {
+  font-size: calc(14px * var(--kiosk-text, 1));
+  color: var(--muted);
+}
+
+.kiosk-picks-reason {
+  margin-top: 6px;
+  font-size: calc(16px * var(--kiosk-text, 1));
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .kiosk-tile:hover {
@@ -334,7 +372,7 @@
   margin-top: 2px;
   font-size: calc(clamp(12px, calc(var(--tile) / 20), 14px) * var(--kiosk-text, 1));
   line-height: 1.25;
-  color: #cdc5bb;
+  color: var(--subtle);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
