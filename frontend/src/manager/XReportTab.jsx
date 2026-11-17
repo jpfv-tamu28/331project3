@@ -14,7 +14,7 @@ const COLUMNS = [
 ];
 
 /** Hourly sales snapshot for one day, today by default. Read-only: running it doesn't reset anything. */
-export default function XReportTab() {
+export default function XReportTab({ refreshKey }) {
   const toast = useToast();
   const [date, setDate] = useState(isoDate());
   const [report, setReport] = useState(null);
@@ -32,7 +32,7 @@ export default function XReportTab() {
     return () => {
       cancelled = true;
     };
-  }, [date, tick, toast]);
+  }, [date, tick, refreshKey, toast]);
 
   const rerun = () => setTick((t) => t + 1);
 

@@ -308,6 +308,68 @@ export function createAuthRoutes({
     res.json({ ok: true });
   });
 
+  // --- Dev-only login shortcut -------------------------------------------
+  // Lets you skip the real Google OAuth flow while developing locally.
+  // Hard-disabled in production and OFF unless explicitly enabled, and every
+  // use is logged so it can never be mistaken for a real sign-in.
+  //
+  // Enable with BOTH:
+  //   NODE_ENV !== 'production'
+  //   DEV_AUTH_BYPASS=true
+  //
+  // Usage: POST /api/auth/dev-login  { "email": "you@example.com", "name": "Dev User" }
+  const devBypassRequested = String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true';
+  const devBypassAllowed = devBypassRequested && process.env.NODE_ENV !== 'production';
+
+  if (devBypassRequested && !devBypassAllowed) {
+    // Someone set the flag in what looks like a production environment.
+    // Refuse loudly instead of silently ignoring it.
+    console.error(
+      '[auth] DEV_AUTH_BYPASS is set but NODE_ENV is "production" — refusing to enable it. ' +
+      'Remove DEV_AUTH_BYPASS from this environment.',
+    );
+  }
+
+  if (devBypassAllowed) {
+    console.warn(
+      '[auth] ⚠️  DEV_AUTH_BYPASS is ENABLED. /api/auth/dev-login will mint sessions ' +
+      'without going through Google. Do not set this in staging or production.',
+    );
+
+    router.post('/dev-login', (req, res) => {
+      const email = typeof req.body?.email === 'string' && req.body.email.trim()
+        ? req.body.email.trim()
+        : 'dev@localhost';
+      const name = typeof req.body?.name === 'string' && req.body.name.trim()
+        ? req.body.name.trim()
+        : email;
+
+      console.warn(`[auth] ⚠️  DEV AUTH BYPASS USED — minting session for "${email}" (no Google verification).`);
+
+      const now = Date.now();
+      const sessionToken = signToken(
+        {
+          sub: `dev:${email}`,
+          email,
+          name,
+          picture: null,
+          dev: true,
+          iat: now,
+          exp: now + SESSION_MAX_AGE_SECONDS * 1000,
+        },
+        secret,
+      );
+
+      const secure = isSecureRequest(req);
+      appendSetCookie(
+        res,
+        serializeCookie(SESSION_COOKIE, sessionToken, { maxAge: SESSION_MAX_AGE_SECONDS, secure }),
+      );
+      res.json({ ok: true, dev: true, user: { sub: `dev:${email}`, email, name } });
+    });
+  }
+  // -------------------------------------------------------------------------
+
   return router;
 }
 
