@@ -13,6 +13,7 @@ import orderRoutes from './routes/orders.js';
 import reportRoutes from './routes/reports.js';
 import weatherRoutes from './routes/weather.js';
 import pokemonRoutes from './routes/pokemon.js';
+import rewardRoutes from './routes/rewards.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -57,6 +58,7 @@ app.use(
 app.use('/api/reports', requireStaffAuth, reportRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/pokemon', pokemonRoutes);
+app.use('/api/rewards', rewardRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found.' });

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { pool, withTransaction } from '../db.js';
 import { asyncRoute, HttpError, requireId } from '../http.js';
+import { claimRewardAccount, requirePhone } from './rewards.js';
 import {
-  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, SIZES, SUGAR_LEVELS, TAX_RATE,
+  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, POINTS_PER_REWARD, REWARD_CENTS, SIZES,
+  SUGAR_LEVELS, TAX_RATE, pointsForPayment,
 } from '../../../shared/orderRules.js';
 
 // Active, in-window, not-exhausted code -> discount row, or null. `db` is the pool or a transaction client.
@@ -86,7 +88,13 @@ export function parseOrderInput(body = {}) {
   const discountCode = typeof body?.discountCode === 'string' && body.discountCode.trim() !== ''
     ? body.discountCode
     : null;
-  return { employeeId, lines, paymentKey, paymentMethod, discountCode };
+  const rewardPhone = body?.rewardPhone == null || body.rewardPhone === '' ? null : requirePhone(body.rewardPhone);
+  const redeemRewards = body?.redeemRewards ?? 0;
+  if (!Number.isInteger(redeemRewards) || redeemRewards < 0) {
+    throw new HttpError(400, 'Rewards to redeem must be a whole number.');
+  }
+  if (redeemRewards > 0 && !rewardPhone) throw new HttpError(400, 'Enter a phone number to redeem rewards.');
+  return { employeeId, lines, paymentKey, paymentMethod, discountCode, rewardPhone, redeemRewards };
 }
 
 export function priceOrder(lines, menuRows, discount = null) {
@@ -251,7 +259,9 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
   //                    discountCode?, paymentMethod }
   // Prices come from the database, not the request, so the total can't be tampered with.
   router.post('/', asyncRoute(async (req, res) => {
-    const { employeeId, lines, paymentKey, paymentMethod, discountCode } = parseOrderInput(req.body);
+    const {
+      employeeId, lines, paymentKey, paymentMethod, discountCode, rewardPhone, redeemRewards,
+    } = parseOrderInput(req.body);
 
     const order = await runTransaction(async (client) => {
       const ids = [...new Set(lines.flatMap((l) => [l.menuItemId, ...l.toppings.map((t) => t.menuItemId)]))];
@@ -265,17 +275,38 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
         ? await redeemDiscount(client, discountCode, subtotalCents)
         : null;
       const discountCents = discountAmount(discount, subtotalCents);
-      const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+      const dueCents = Math.max(0, subtotalCents + taxCents - discountCents);
+
+      const account = rewardPhone ? await claimRewardAccount(client, rewardPhone) : null;
+      const pointsRedeemed = redeemRewards * POINTS_PER_REWARD;
+      const rewardCents = redeemRewards * REWARD_CENTS;
+      if (account && pointsRedeemed > account.points) {
+        throw new HttpError(400, `Not enough points: you have ${account.points}, this needs ${pointsRedeemed}.`);
+      }
+      if (rewardCents > dueCents) throw new HttpError(400, "Rewards can't be more than the order total.");
+      const totalCents = dueCents - rewardCents;
+      const pointsEarned = account ? pointsForPayment(totalCents) : 0;
 
       // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
       await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
       const { rows: [{ id: orderId }] } = await client.query(
         `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method,
-                             discount_code_id, discount_cents)
-         VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3, $4, $5)
+                             discount_code_id, discount_cents, reward_account_id, points_earned,
+                             points_redeemed, reward_cents)
+         VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3, $4, $5,
+                 $6, $7, $8, $9)
          RETURNING order_id AS id`,
-        [employeeId, totalCents, paymentMethod, discount?.id ?? null, discountCents],
+        [employeeId, totalCents, paymentMethod, discount?.id ?? null, discountCents,
+          account?.id ?? null, pointsEarned, pointsRedeemed, rewardCents],
       );
+      let pointsBalance = null;
+      if (account) {
+        const { rows: [updated] } = await client.query(
+          'UPDATE reward_accounts SET points = points - $2 + $3 WHERE reward_account_id = $1 RETURNING points',
+          [account.id, pointsRedeemed, pointsEarned],
+        );
+        pointsBalance = updated.points;
+      }
 
       const insertLine = `INSERT INTO order_items
         (order_id, menu_item_id, parent_order_item_id, item_name_snapshot, quantity, unit_price_cents)
@@ -291,7 +322,10 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
         }
       }
       await deductOrderInventory(client, orderId);
-      return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
+      return {
+        id: orderId, subtotalCents, taxCents, discountCents, rewardCents, totalCents, paymentMethod: paymentKey,
+        pointsEarned, pointsBalance,
+      };
     });
 
     res.status(201).json(order);

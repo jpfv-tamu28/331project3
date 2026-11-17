@@ -357,6 +357,7 @@ describe('orders HTTP routes', () => {
   let baseUrl;
   let recordedInserts;
   let availableMenu;
+  let rewardPoints;
 
   before(async () => {
     availableMenu = SAMPLE_MENU;
@@ -373,6 +374,12 @@ describe('orders HTTP routes', () => {
         }
         if (sql.startsWith('UPDATE discount_codes')) {
           return { rowCount: 1 };
+        }
+        if (sql.startsWith('INSERT INTO reward_accounts')) return { rows: [] };
+        if (sql.includes('FROM reward_accounts')) return { rows: [{ id: 5, points: rewardPoints }] };
+        if (sql.startsWith('UPDATE reward_accounts')) {
+          recordedInserts.push({ table: 'reward_accounts', params });
+          return { rows: [{ points: rewardPoints - params[1] + params[2] }] };
         }
         if (sql.startsWith('LOCK TABLE')) {
           return { rows: [] };
@@ -464,12 +471,15 @@ describe('orders HTTP routes', () => {
       subtotalCents: 2175,
       taxCents: 179,
       discountCents: 218,
+      rewardCents: 0,
       totalCents: 2136,
       paymentMethod: 'cash',
+      pointsEarned: 0,
+      pointsBalance: null,
     });
 
     assert.deepEqual(recordedInserts, [
-      { table: 'orders', params: [1, 2136, 'Cash', 7, 218] },
+      { table: 'orders', params: [1, 2136, 'Cash', 7, 218, null, 0, 0, 0] },
       {
         table: 'order_items',
         params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 575],
@@ -500,6 +510,57 @@ describe('orders HTTP routes', () => {
     });
     assert.equal(badDiscount.status, 400);
     assert.match((await badDiscount.json()).error, /not a valid discount code/);
+    assert.equal(recordedInserts.length, 0);
+  });
+
+  const orderWithRewards = (extra) => fetch(`${baseUrl}/api/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: [validLine()], ...extra }),
+  });
+
+  it('earns 10 points per dollar paid when a phone number is given', async () => {
+    recordedInserts = [];
+    rewardPoints = 0;
+    // 525 + tax 43 = 568 paid -> 56 points
+    const res = await orderWithRewards({ rewardPhone: '(979) 555-0123' });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.pointsEarned, 56);
+    assert.equal(body.pointsBalance, 56);
+    assert.deepEqual(recordedInserts[0].params.slice(-4), [5, 56, 0, 0]);
+    assert.deepEqual(recordedInserts.find((r) => r.table === 'reward_accounts').params, [5, 0, 56]);
+  });
+
+  it('takes $1 off per 1,000 points redeemed and earns on what is still paid', async () => {
+    recordedInserts = [];
+    rewardPoints = 2500;
+    const res = await orderWithRewards({ rewardPhone: '9795550123', redeemRewards: 2 });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    // 568 - 200 = 368 paid -> 36 points; 2500 - 2000 + 36 = 536
+    assert.equal(body.rewardCents, 200);
+    assert.equal(body.totalCents, 368);
+    assert.equal(body.pointsEarned, 36);
+    assert.equal(body.pointsBalance, 536);
+    assert.deepEqual(recordedInserts[0].params.slice(-4), [5, 36, 2000, 200]);
+  });
+
+  it('rejects redemptions the customer cannot afford or that exceed the total', async () => {
+    recordedInserts = [];
+    const cases = [
+      [{ rewardPoints: 500, body: { rewardPhone: '9795550123', redeemRewards: 1 } }, /Not enough points/],
+      [{ rewardPoints: 10000, body: { rewardPhone: '9795550123', redeemRewards: 6 } }, /more than the order total/],
+      [{ rewardPoints: 5000, body: { redeemRewards: 1 } }, /phone number to redeem/],
+      [{ rewardPoints: 0, body: { rewardPhone: '555-0123' } }, /10-digit phone number/],
+      [{ rewardPoints: 5000, body: { rewardPhone: '9795550123', redeemRewards: 1.5 } }, /whole number/],
+    ];
+    for (const [{ rewardPoints: points, body }, message] of cases) {
+      rewardPoints = points;
+      const res = await orderWithRewards(body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.match((await res.json()).error, message);
+    }
     assert.equal(recordedInserts.length, 0);
   });
 

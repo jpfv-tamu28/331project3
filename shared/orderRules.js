@@ -25,3 +25,22 @@ export const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
   { value: 'giftcard', label: 'Gift Card' },
 ];
+
+// Rewards: customers earn points on what they pay and trade 1,000 points for $1 off.
+export const POINTS_PER_DOLLAR = 10;
+export const POINTS_PER_REWARD = 1000;
+export const REWARD_CENTS = 100;
+
+/** Points earned for paying `paidCents`; partial points round down. */
+export const pointsForPayment = (paidCents) => Math.floor((paidCents * POINTS_PER_DOLLAR) / 100);
+
+/** How many $1 rewards a balance can pay for on an order of `totalCents`. */
+export const maxRewards = (points, totalCents) => Math.max(0,
+  Math.min(Math.floor(points / POINTS_PER_REWARD), Math.floor(totalCents / REWARD_CENTS)));
+
+/** US phone number -> its 10 digits, or null. Accepts any punctuation and a leading 1. */
+export function normalizePhone(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  return local.length === 10 ? local : null;
+}
