@@ -50,7 +50,7 @@ Make sure you are on TAMU Wifi or TAMU VPN.
 | `/` | Portal: choose Customer Kiosk (public), or Cashier / Manager (protected by Google OAuth). |
 | `/kiosk` | Self-order kiosk for a landscape iPad (no sign-in required): menu sections scroll left to right with two rows of large square tiles; section tabs across the top jump between them; tapping a tile opens the same customize dialog the cashier uses; the cart button (top left) opens and closes the order panel; placing an order shows the order number and resets after 20 seconds. |
 | `/cashier` | Requires Google OAuth sign-in. Menu grid with category tabs and search, drink customization (size, ice, sugar incl. 200%, add-ons ×1–5, quantity), current order with tax, discount code, payment method, order history. |
-| `/manager` | Requires Google OAuth sign-in. Menu items (add, edit, seasonal item with recipe), inventory (low-stock grouping, restock deliveries), employees, sales reports, X-report, product usage chart, discounts. |
+| `/manager` | Requires Google OAuth sign-in. Menu items (add, edit, seasonal item with recipe), inventory (stock status and usage forecast, suggested restocks, recipe usage, CSV export), employees, sales reports, X-report, product usage chart, discounts. |
 
 The portal is the only screen that links to the views. Once a view is open it has no link to the portal or to
 another view, and the portal is replaced in the browser history, so Back doesn't return to it either.
@@ -70,7 +70,11 @@ All routes are under `/api`. Errors come back as `{ "error": "message" }`.
 | GET | `/menu[?available=true]` | all items, or only sellable ones |
 | POST / PUT | `/menu`, `/menu/:id` | `{ name, category, itemType, priceCents, isAvailable }` (requires OAuth) |
 | POST | `/menu/seasonal` | adds a Seasonal item and its recipe in one transaction (requires OAuth) |
-| GET / POST / PUT | `/inventory`, `/inventory/:id` | `{ name, unit, onHand, reorderLevel }` (requires OAuth) |
+| GET | `/inventory` | ingredients with `dailyUse` (average over the last 28 days of sales) and `usedIn` (number of menu items whose recipe uses it) (requires OAuth) |
+| POST | `/inventory` | `{ name, unit, onHand, reorderLevel }` (requires OAuth) |
+| PUT | `/inventory/:id` | `{ name, unit, reorderLevel, onHand?, expectedOnHand? }`; omit `onHand` to keep live stock; if `expectedOnHand` no longer matches (sales happened meanwhile) it answers 409 (requires OAuth) |
+| DELETE | `/inventory/:id` | 409 while a recipe still uses the ingredient (requires OAuth) |
+| GET | `/inventory/:id/recipes` | menu items using the ingredient, with amount per serving (requires OAuth) |
 | POST | `/inventory/restock` | `{ items: [{ id, amount }] }` adds each amount to on hand (never overwrites, so concurrent sales aren't lost); all-or-nothing; returns the updated ingredients (requires OAuth) |
 | GET / POST / PUT | `/employees`, `/employees/:id` | `{ name, role, pin, isActive }`; PINs are never returned (requires OAuth) |
 | GET | `/orders?limit=100` | most recent first (requires OAuth) |

@@ -1,51 +1,97 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { DenseList } from '../components/DenseList';
 import { Modal } from '../components/Modal';
+import { Segmented } from '../components/Segmented';
+import { StatTiles } from '../components/StatTiles';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { quantity } from '../format';
+import { isoDate, quantity } from '../format';
+import {
+  COVER_DAYS, SOON_DAYS, STATUS, URGENT_GROUPS, USAGE_WINDOW_DAYS,
+  describeSupply, inventoryCsv, needsAttention, stockStatus, suggestedRestock,
+} from './inventoryStatus';
 
 const UNITS = ['g', 'ml', 'each'];
-const LOW = 'Below reorder level';
-const isLow = (i) => i.onHand <= i.reorderLevel;
 
 const FILTERS = [
   { label: 'All', test: () => true },
-  { label: 'Low stock', test: isLow },
+  { label: 'Needs attention', test: needsAttention },
+  { label: 'Not in any recipe', test: (i) => i.usedIn === 0 },
 ];
+
+const usageText = (i) => (i.dailyUse > 0 ? `~${quantity(i.dailyUse)} ${i.unit}/day` : null);
 
 const describe = (i) => ({
   title: i.name,
-  subtitle: `Updated ${i.updatedAt} · #${i.id}`,
+  subtitle: [usageText(i), describeSupply(i), `Updated ${i.updatedAt}`].filter(Boolean).join(' · '),
   value: `${quantity(i.onHand)} ${i.unit}`,
   detail: `reorder at ${quantity(i.reorderLevel)}`,
-  badge: isLow(i) ? { text: 'Low stock', alert: true } : null,
+  badge: STATUS[stockStatus(i)].badge,
 });
+
+const groupOf = (i) => STATUS[stockStatus(i)].group;
+
+function downloadCsv(items) {
+  const blob = new Blob([inventoryCsv(items)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `inventory-${isoDate()}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function InventoryTab({ refreshKey }) {
   const inventory = useResource(() => Api.inventory(), [refreshKey]);
   const [editing, setEditing] = useState(null);
   const [restocking, setRestocking] = useState(null); // ingredients shown in the restock dialog
 
+  const counts = useMemo(() => {
+    const c = { out: 0, low: 0, soon: 0, ok: 0 };
+    for (const i of inventory.data ?? []) c[stockStatus(i)] += 1;
+    return c;
+  }, [inventory.data]);
+
   if (!inventory.data) {
     return <StateMessage loading={inventory.loading} error={inventory.error} onRetry={inventory.reload} />;
   }
+  const items = inventory.data;
+  const done = () => {
+    setEditing(null);
+    setRestocking(null);
+    inventory.reload();
+  };
+
   return (
-    <>
+    <div className="inventory-tab">
+      <div className="inventory-summary">
+        <StatTiles tiles={[
+          { label: 'Ingredients', value: items.length },
+          { label: 'Out of stock', value: counts.out },
+          { label: 'Below reorder level', value: counts.out + counts.low },
+          { label: `Reorder within ${SOON_DAYS} days`, value: counts.soon },
+        ]} />
+        <p className="inventory-note">
+          Usage is averaged over the last {USAGE_WINDOW_DAYS} days of sales.
+        </p>
+      </div>
       <DenseList
-        items={inventory.data}
+        items={items}
         searchLabel="Search ingredients"
         filters={FILTERS}
-        groupOf={(i) => (isLow(i) ? LOW : 'In stock')}
-        pinnedGroups={[LOW]}
+        groupOf={groupOf}
+        pinnedGroups={URGENT_GROUPS}
         describe={describe}
         onOpen={setEditing}
         noun="ingredient"
         actions={(
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => setRestocking(inventory.data)}>Restock</button>
+            <button type="button" className="btn btn-ghost" onClick={() => downloadCsv(items)}>Export CSV</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setRestocking(items)}>Restock</button>
             <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Ingredient</button>
           </>
         )}
@@ -54,10 +100,7 @@ export default function InventoryTab({ refreshKey }) {
         <IngredientDialog
           item={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            inventory.reload();
-          }}
+          onSaved={done}
           onRestock={() => {
             setRestocking([editing]);
             setEditing(null);
@@ -65,16 +108,9 @@ export default function InventoryTab({ refreshKey }) {
         />
       )}
       {restocking && (
-        <RestockDialog
-          items={restocking}
-          onClose={() => setRestocking(null)}
-          onSaved={() => {
-            setRestocking(null);
-            inventory.reload();
-          }}
-        />
+        <RestockDialog items={restocking} onClose={() => setRestocking(null)} onSaved={done} />
       )}
-    </>
+    </div>
   );
 }
 
@@ -89,8 +125,11 @@ function IngredientDialog({ item, onClose, onSaved, onRestock }) {
   const [name, setName] = useState(item.name ?? '');
   const [unit, setUnit] = useState(item.unit ?? UNITS[0]);
   const [onHand, setOnHand] = useState(item.onHand != null ? String(item.onHand) : '');
+  // The stock the form was opened with; sales may change it in the database while the dialog is open.
+  const [baseline, setBaseline] = useState(item.onHand ?? null);
   const [reorderLevel, setReorderLevel] = useState(item.reorderLevel != null ? String(item.reorderLevel) : '');
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const save = async () => {
     if (!name.trim()) {
@@ -103,14 +142,39 @@ function IngredientDialog({ item, onClose, onSaved, onRestock }) {
       toast.warning('Check the amounts', 'On hand and reorder level must be non-negative numbers.');
       return;
     }
+    const body = { name: name.trim(), unit, reorderLevel: reorderQty };
+    // Only send on hand when it was changed, so saving a rename never overwrites recent sales.
+    if (!editingId) body.onHand = onHandQty;
+    else if (onHandQty !== baseline) Object.assign(body, { onHand: onHandQty, expectedOnHand: baseline });
+
     setBusy(true);
     try {
-      await Api.saveIngredient(editingId, { name: name.trim(), unit, onHand: onHandQty, reorderLevel: reorderQty });
+      await Api.saveIngredient(editingId, body);
       toast.success(editingId ? 'Ingredient updated' : 'Ingredient added', name.trim());
       onSaved();
     } catch (err) {
-      toast.error('Error saving ingredient', errorMessage(err));
       setBusy(false);
+      if (err?.response?.status === 409) {
+        // Accept the new database value as the baseline; saving again sets the typed amount.
+        const fresh = (await Api.inventory().catch(() => [])).find((i) => i.id === editingId);
+        if (fresh) setBaseline(fresh.onHand);
+        toast.warning('Stock changed while you were editing', `${errorMessage(err)} Press Save again to keep ${quantity(onHandQty)} ${unit}.`);
+        return;
+      }
+      toast.error('Error saving ingredient', errorMessage(err));
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await Api.deleteIngredient(editingId);
+      toast.success('Ingredient deleted', item.name);
+      onSaved();
+    } catch (err) {
+      toast.error('Could not delete ingredient', errorMessage(err));
+      setBusy(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -123,6 +187,7 @@ function IngredientDialog({ item, onClose, onSaved, onRestock }) {
       onSubmit={save}
       onClose={onClose}
       busy={busy}
+      width={editingId ? 520 : undefined}
       headerAction={editingId && (
         <button type="button" className="btn btn-secondary" onClick={onRestock} disabled={busy}>Restock…</button>
       )}
@@ -140,21 +205,116 @@ function IngredientDialog({ item, onClose, onSaved, onRestock }) {
         <input id="in-reorder" className="field" inputMode="decimal" value={reorderLevel}
           onChange={(e) => setReorderLevel(e.target.value)} />
       </div>
+      {editingId && (
+        <>
+          <IngredientStats item={item} />
+          <IngredientRecipes id={editingId} unit={item.unit} />
+          <div className="ingredient-danger">
+            {item.usedIn > 0 ? (
+              <p className="muted">To delete this ingredient, first remove it from the recipes above.</p>
+            ) : confirmingDelete ? (
+              <>
+                <span>Delete {item.name} permanently?</span>
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmingDelete(false)} disabled={busy}>Keep</button>
+                <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>Delete</button>
+              </>
+            ) : (
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmingDelete(true)} disabled={busy}>
+                Delete ingredient…
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
 
-/** Adds delivered amounts to on-hand stock. Low-stock ingredients are listed first. */
+function IngredientStats({ item }) {
+  const status = stockStatus(item);
+  const suggestion = suggestedRestock(item);
+  return (
+    <dl className="ingredient-stats">
+      <div>
+        <dt>Avg use per day</dt>
+        <dd>{item.dailyUse > 0 ? `${quantity(item.dailyUse)} ${item.unit}` : 'None recently'}</dd>
+      </div>
+      <div>
+        <dt>Supply</dt>
+        <dd>{describeSupply(item)}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd className={STATUS[status].badge?.alert ? 'text-alert' : undefined}>{STATUS[status].group}</dd>
+      </div>
+      {suggestion > 0 && (
+        <div>
+          <dt>Suggested order</dt>
+          <dd>{quantity(suggestion)} {item.unit}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+function IngredientRecipes({ id, unit }) {
+  const recipes = useResource(() => Api.ingredientRecipes(id), [id]);
+  return (
+    <div className="recipe-table">
+      <table className="data-table">
+        <caption className="sr-only">Menu items that use this ingredient</caption>
+        <thead>
+          <tr>
+            <th scope="col"><span>Used in</span></th>
+            <th scope="col" className="num"><span>Per serving</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {!recipes.data ? (
+            <tr><td colSpan={2} className="table-empty">{recipes.error ?? 'Loading…'}</td></tr>
+          ) : recipes.data.length === 0 ? (
+            <tr><td colSpan={2} className="table-empty">Not used in any menu item</td></tr>
+          ) : recipes.data.map((m) => (
+            <tr key={m.id}>
+              <td>
+                {m.name}
+                {!m.isAvailable && <span className="badge" style={{ marginLeft: 8 }}>Unavailable</span>}
+              </td>
+              <td className="num">{quantity(m.quantity)} {unit}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Adds delivered amounts to on-hand stock. Ingredients needing attention are listed first. */
 function RestockDialog({ items, onClose, onSaved }) {
   const toast = useToast();
+  const single = items.length === 1;
+  const attentionCount = items.filter(needsAttention).length;
+  const [scope, setScope] = useState(!single && attentionCount > 0 ? 'attention' : 'all');
   const [amounts, setAmounts] = useState({}); // id -> text typed
   const [busy, setBusy] = useState(false);
 
-  const rows = [...items].sort((a, b) => (isLow(b) - isLow(a)) || a.name.localeCompare(b.name));
+  const urgency = { out: 0, low: 1, soon: 2, ok: 3 };
+  const rows = items
+    .filter((i) => scope === 'all' || needsAttention(i))
+    .sort((a, b) => (urgency[stockStatus(a)] - urgency[stockStatus(b)]) || a.name.localeCompare(b.name));
+  const suggestions = rows.filter((i) => suggestedRestock(i) > 0);
+
+  const fillSuggested = () => {
+    setAmounts((a) => ({
+      ...a,
+      ...Object.fromEntries(suggestions.map((i) => [i.id, String(suggestedRestock(i))])),
+    }));
+  };
 
   const save = async () => {
     const lines = [];
-    for (const item of rows) {
+    // Amounts typed for rows hidden by the "Needs attention" view are still restocked.
+    for (const item of items) {
       const text = String(amounts[item.id] ?? '').trim();
       if (text === '') continue;
       const amount = parseAmount(text);
@@ -186,13 +346,33 @@ function RestockDialog({ items, onClose, onSaved }) {
 
   return (
     <Modal
-      title={rows.length === 1 ? `Restock ${rows[0].name}` : 'Restock Inventory'}
+      title={single ? `Restock ${items[0].name}` : 'Restock Inventory'}
       submitLabel="Restock"
       onSubmit={save}
       onClose={onClose}
       busy={busy}
-      width={560}
+      width={620}
     >
+      <div className="restock-toolbar">
+        {!single && (
+          <Segmented
+            label="Show"
+            options={[
+              { value: 'attention', label: `Needs attention (${attentionCount})` },
+              { value: 'all', label: `All (${items.length})` },
+            ]}
+            value={scope}
+            onChange={setScope}
+          />
+        )}
+        <button type="button" className="btn btn-secondary" onClick={fillSuggested} disabled={busy || suggestions.length === 0}>
+          Fill suggested amounts
+        </button>
+      </div>
+      <p className="inventory-note">
+        Suggestions bring stock back to the reorder level plus {COVER_DAYS} days of recent use
+        (or the reorder level again, if that is more).
+      </p>
       <div className="recipe-table restock-table">
         <table className="data-table">
           <caption className="sr-only">Amounts received</caption>
@@ -205,13 +385,17 @@ function RestockDialog({ items, onClose, onSaved }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((item) => {
+            {rows.length === 0 ? (
+              <tr><td colSpan={4} className="table-empty">Nothing needs restocking right now</td></tr>
+            ) : rows.map((item) => {
               const added = parseAmount(amounts[item.id] ?? '');
+              const suggestion = suggestedRestock(item);
+              const badge = STATUS[stockStatus(item)].badge;
               return (
                 <tr key={item.id}>
                   <td>
                     {item.name}
-                    {isLow(item) && <span className="badge badge-alert" style={{ marginLeft: 8 }}>Low</span>}
+                    {badge && <span className={`badge${badge.alert ? ' badge-alert' : ''}`} style={{ marginLeft: 8 }}>{badge.text}</span>}
                   </td>
                   <td className="num">{quantity(item.onHand)} {item.unit}</td>
                   <td className="num">
@@ -219,6 +403,7 @@ function RestockDialog({ items, onClose, onSaved }) {
                       className="field"
                       inputMode="decimal"
                       placeholder="0"
+                      title={suggestion > 0 ? `Suggested: ${quantity(suggestion)} ${item.unit}` : undefined}
                       aria-label={`Amount of ${item.name} to add (${item.unit})`}
                       value={amounts[item.id] ?? ''}
                       onChange={(e) => setAmounts((a) => ({ ...a, [item.id]: e.target.value }))}

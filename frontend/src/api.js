@@ -40,6 +40,8 @@ export const Api = {
     (id ? api.put(`/inventory/${id}`, item) : api.post('/inventory', item)).then((r) => r.data),
   /** items: [{ id, amount }]; adds each amount to on hand and returns the updated ingredients. */
   restockInventory: (items) => api.post('/inventory/restock', { items }).then((r) => r.data),
+  ingredientRecipes: (id) => api.get(`/inventory/${id}/recipes`).then((r) => r.data),
+  deleteIngredient: (id) => api.delete(`/inventory/${id}`).then((r) => r.data),
 
   employees: () => api.get('/employees').then((r) => r.data),
   saveEmployee: (id, emp) =>
