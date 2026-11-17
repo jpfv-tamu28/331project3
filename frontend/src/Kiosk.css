@@ -296,8 +296,9 @@
   padding: 14px 16px 16px;
   border: 0;
   border-radius: 20px;
-  background: #000;
-  color: #fff;
+  /* The drink's flavor color washed toward the theme's background, so tiles follow light/dark/contrast. */
+  background: color-mix(in srgb, var(--tile-color, #c9a27e) var(--tile-mix, 20%), var(--tile-base, #fff));
+  color: var(--text);
   text-align: left;
   transition: transform 0.12s, box-shadow 0.12s;
   
@@ -371,7 +372,7 @@
   margin-top: 2px;
   font-size: calc(clamp(12px, calc(var(--tile) / 20), 14px) * var(--kiosk-text, 1));
   line-height: 1.25;
-  color: #cdc5bb;
+  color: var(--subtle);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
