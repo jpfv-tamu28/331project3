@@ -27,6 +27,7 @@ const describe = (i) => ({
 export default function InventoryTab({ refreshKey }) {
   const inventory = useResource(() => Api.inventory(), [refreshKey]);
   const [editing, setEditing] = useState(null);
+  const [restocking, setRestocking] = useState(null); // ingredients shown in the restock dialog
 
   if (!inventory.data) {
     return <StateMessage loading={inventory.loading} error={inventory.error} onRetry={inventory.reload} />;
@@ -42,7 +43,12 @@ export default function InventoryTab({ refreshKey }) {
         describe={describe}
         onOpen={setEditing}
         noun="ingredient"
-        actions={<button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Ingredient</button>}
+        actions={(
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setRestocking(inventory.data)}>Restock</button>
+            <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Ingredient</button>
+          </>
+        )}
       />
       {editing && (
         <IngredientDialog
@@ -50,6 +56,20 @@ export default function InventoryTab({ refreshKey }) {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
+            inventory.reload();
+          }}
+          onRestock={() => {
+            setRestocking([editing]);
+            setEditing(null);
+          }}
+        />
+      )}
+      {restocking && (
+        <RestockDialog
+          items={restocking}
+          onClose={() => setRestocking(null)}
+          onSaved={() => {
+            setRestocking(null);
             inventory.reload();
           }}
         />
@@ -63,7 +83,7 @@ const parseAmount = (text) => {
   return String(text).trim() !== '' && Number.isFinite(n) && n >= 0 ? n : null;
 };
 
-function IngredientDialog({ item, onClose, onSaved }) {
+function IngredientDialog({ item, onClose, onSaved, onRestock }) {
   const toast = useToast();
   const editingId = item.id ?? null;
   const [name, setName] = useState(item.name ?? '');
@@ -97,7 +117,16 @@ function IngredientDialog({ item, onClose, onSaved }) {
   // Units the Java form didn't offer (from older data) stay selectable when editing.
   const unitOptions = UNITS.includes(unit) ? UNITS : [...UNITS, unit];
   return (
-    <Modal title={editingId ? 'Edit Ingredient' : 'Add Ingredient'} submitLabel="Save" onSubmit={save} onClose={onClose} busy={busy}>
+    <Modal
+      title={editingId ? 'Edit Ingredient' : 'Add Ingredient'}
+      submitLabel="Save"
+      onSubmit={save}
+      onClose={onClose}
+      busy={busy}
+      headerAction={editingId && (
+        <button type="button" className="btn btn-secondary" onClick={onRestock} disabled={busy}>Restock…</button>
+      )}
+    >
       <div className="form-grid">
         <label htmlFor="in-name">Ingredient</label>
         <input id="in-name" className="field" value={name} onChange={(e) => setName(e.target.value)} />
@@ -110,6 +139,98 @@ function IngredientDialog({ item, onClose, onSaved }) {
         <label htmlFor="in-reorder">Reorder Level</label>
         <input id="in-reorder" className="field" inputMode="decimal" value={reorderLevel}
           onChange={(e) => setReorderLevel(e.target.value)} />
+      </div>
+    </Modal>
+  );
+}
+
+/** Adds delivered amounts to on-hand stock. Low-stock ingredients are listed first. */
+function RestockDialog({ items, onClose, onSaved }) {
+  const toast = useToast();
+  const [amounts, setAmounts] = useState({}); // id -> text typed
+  const [busy, setBusy] = useState(false);
+
+  const rows = [...items].sort((a, b) => (isLow(b) - isLow(a)) || a.name.localeCompare(b.name));
+
+  const save = async () => {
+    const lines = [];
+    for (const item of rows) {
+      const text = String(amounts[item.id] ?? '').trim();
+      if (text === '') continue;
+      const amount = parseAmount(text);
+      if (amount === null || amount === 0) {
+        toast.warning('Check the amounts', `Restock amount for ${item.name} must be a positive number.`);
+        return;
+      }
+      lines.push({ id: item.id, amount });
+    }
+    if (lines.length === 0) {
+      toast.warning('Nothing to restock', 'Enter an amount for at least one ingredient.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await Api.restockInventory(lines);
+      toast.success(
+        'Inventory restocked',
+        updated.length === 1
+          ? `${updated[0].name}: now ${quantity(updated[0].onHand)} ${updated[0].unit}`
+          : `${updated.length} ingredients updated`,
+      );
+      onSaved();
+    } catch (err) {
+      toast.error('Error restocking', errorMessage(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={rows.length === 1 ? `Restock ${rows[0].name}` : 'Restock Inventory'}
+      submitLabel="Restock"
+      onSubmit={save}
+      onClose={onClose}
+      busy={busy}
+      width={560}
+    >
+      <div className="recipe-table restock-table">
+        <table className="data-table">
+          <caption className="sr-only">Amounts received</caption>
+          <thead>
+            <tr>
+              <th scope="col"><span>Ingredient</span></th>
+              <th scope="col" className="num"><span>On hand</span></th>
+              <th scope="col" className="num"><span>Add</span></th>
+              <th scope="col" className="num"><span>New total</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item) => {
+              const added = parseAmount(amounts[item.id] ?? '');
+              return (
+                <tr key={item.id}>
+                  <td>
+                    {item.name}
+                    {isLow(item) && <span className="badge badge-alert" style={{ marginLeft: 8 }}>Low</span>}
+                  </td>
+                  <td className="num">{quantity(item.onHand)} {item.unit}</td>
+                  <td className="num">
+                    <input
+                      className="field"
+                      inputMode="decimal"
+                      placeholder="0"
+                      aria-label={`Amount of ${item.name} to add (${item.unit})`}
+                      value={amounts[item.id] ?? ''}
+                      onChange={(e) => setAmounts((a) => ({ ...a, [item.id]: e.target.value }))}
+                      style={{ width: 90 }}
+                    />
+                  </td>
+                  <td className="num">{added ? `${quantity(item.onHand + added)} ${item.unit}` : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </Modal>
   );

@@ -157,7 +157,11 @@
   overflow: auto;
 }
 
-.recipe-table td:last-child {
+.recipe-table.restock-table {
+  max-height: min(60vh, 480px);
+}
+
+.recipe-table:not(.restock-table) td:last-child {
   width: 1%;
   text-align: right;
 }

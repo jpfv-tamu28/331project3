@@ -38,6 +38,8 @@ export const Api = {
   inventory: () => api.get('/inventory').then((r) => r.data),
   saveIngredient: (id, item) =>
     (id ? api.put(`/inventory/${id}`, item) : api.post('/inventory', item)).then((r) => r.data),
+  /** items: [{ id, amount }]; adds each amount to on hand and returns the updated ingredients. */
+  restockInventory: (items) => api.post('/inventory/restock', { items }).then((r) => r.data),
 
   employees: () => api.get('/employees').then((r) => r.data),
   saveEmployee: (id, emp) =>
@@ -48,8 +50,6 @@ export const Api = {
   discounts: () => api.get('/orders/discounts').then((r) => r.data),
   createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   checkDiscount: (code) => api.get(`/orders/discounts/${encodeURIComponent(code)}`).then((r) => r.data),
-  discounts: () => api.get('/orders/discounts').then((r) => r.data),
-  createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   createOrder: (order) => api.post('/orders', order).then((r) => r.data),
 
   reportList: () => api.get('/reports').then((r) => r.data),
