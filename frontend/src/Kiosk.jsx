@@ -12,6 +12,7 @@ import DrinkArt from './kiosk/DrinkArt';
 import OrderBuddy from './kiosk/OrderBuddy';
 import { flavorColor } from './kiosk/drinkColors';
 import SettingsDialog from './kiosk/SettingsDialog';
+import WeatherIcon from './kiosk/WeatherIcon';
 import { useKioskSettings } from './kiosk/useKioskSettings';
 import gearIcon from './assets/gear.png';
 import TranslateButton from './components/TranslateButton';
@@ -315,6 +316,14 @@ export default function Kiosk() {
               <section key={category} id={sectionId(category)} className="kiosk-section" aria-labelledby={`${sectionId(category)}-title`}>
                 <h2 id={`${sectionId(category)}-title`}>{category}</h2>
                 <ul className="kiosk-grid">
+                  {category === PICKS_SECTION && suggestions.data?.weather && (
+                    <li className="kiosk-picks-card">
+                      <WeatherIcon icon={suggestions.data.weather.icon} isDay={suggestions.data.weather.isDay} className="kiosk-picks-icon" />
+                      <span className="kiosk-picks-temp">{suggestions.data.weather.temperatureF}°F</span>
+                      <span className="kiosk-picks-condition">{suggestions.data.weather.condition}</span>
+                      <span className="kiosk-picks-reason">{suggestions.data.reason}</span>
+                    </li>
+                  )}
                   {drinks.map((item) => (
                     <li key={item.id}>
                       <button
