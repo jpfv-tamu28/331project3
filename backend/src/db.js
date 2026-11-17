@@ -7,7 +7,16 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (value) => (value === null ? null
 // TIMESTAMP (without time zone) is stored as shop-local wall time; keep it as text so it isn't shifted to UTC.
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => value);
 
+// Timestamps are stored as shop-local wall time (TIMESTAMP without time zone), so every session must
+// use the shop's time zone: otherwise LOCALTIMESTAMP / CURRENT_DATE / NOW() follow the server's (UTC on
+// the TAMU server), new orders are stamped hours ahead, and evening orders land on the next day's reports.
+export const SHOP_TIMEZONE = process.env.SHOP_TIMEZONE || 'America/Chicago';
+if (!/^[A-Za-z0-9_+\-/]+$/.test(SHOP_TIMEZONE)) {
+  throw new Error(`SHOP_TIMEZONE "${SHOP_TIMEZONE}" is not a valid time zone name.`);
+}
+
 export const pool = new pg.Pool({
+  options: `-c TimeZone=${SHOP_TIMEZONE}`,
   host: process.env.DB_HOST || 'csce-315-db.engr.tamu.edu',
   port: Number(process.env.DB_PORT || 5432),
   database: process.env.DB_NAME || 'squad_55_db',
