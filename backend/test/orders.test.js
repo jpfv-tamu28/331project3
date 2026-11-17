@@ -4,6 +4,7 @@ import express from 'express';
 import { HttpError } from '../src/http.js';
 import {
   createOrderRoutes,
+  deductOrderInventory,
   discountAmount,
   discountLabel,
   lookupDiscount,
@@ -331,6 +332,26 @@ describe('priceOrder', () => {
   });
 });
 
+describe('deductOrderInventory', () => {
+  it('updates inventory quantities by joining order_items with recipes for the order', async () => {
+    const calls = [];
+    const fakeClient = {
+      async query(sql, params) {
+        calls.push({ sql, params });
+        return { rowCount: 2 };
+      },
+    };
+
+    await deductOrderInventory(fakeClient, 42);
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].params, [42]);
+    assert.match(calls[0].sql, /UPDATE inventory/i);
+    assert.match(calls[0].sql, /JOIN recipes/i);
+    assert.match(calls[0].sql, /FROM order_items/i);
+  });
+});
+
 describe('orders HTTP routes', () => {
   let server;
   let baseUrl;
@@ -364,6 +385,10 @@ describe('orders HTTP routes', () => {
           const id = 100 + recordedInserts.length;
           recordedInserts.push({ table: 'order_items', params });
           return { rows: [{ id }] };
+        }
+        if (sql.startsWith('UPDATE inventory')) {
+          recordedInserts.push({ table: 'inventory', params });
+          return { rowCount: 1 };
         }
         throw new Error(`Unexpected SQL in test: ${sql}`);
       },
@@ -454,6 +479,7 @@ describe('orders HTTP routes', () => {
         table: 'order_items',
         params: [42, 10, 101, 'Tapioca Pearls (Boba)', 6, 75],
       },
+      { table: 'inventory', params: [42] },
     ]);
   });
 

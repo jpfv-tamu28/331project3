@@ -3,12 +3,16 @@ import { describe, it } from 'node:test';
 import { DEX_SIZE, dexNumber, toPokemon } from '../src/routes/pokemon.js';
 
 describe('dexNumber', () => {
-  it('keeps 1..DEX_SIZE unchanged and wraps larger order numbers back to 1', () => {
+  it('keeps 1..DEX_SIZE unchanged and matches trailing digits for larger order numbers', () => {
     assert.equal(dexNumber(1), 1);
     assert.equal(dexNumber(25), 25);
+    assert.equal(dexNumber(1000), 1000);
     assert.equal(dexNumber(DEX_SIZE), DEX_SIZE);
-    assert.equal(dexNumber(DEX_SIZE + 1), 1);
-    assert.equal(dexNumber(DEX_SIZE * 3 + 25), 25);
+    assert.equal(dexNumber(1026), 26);
+    assert.equal(dexNumber(35147), 147);
+    assert.equal(dexNumber(31015), 1015);
+    assert.equal(dexNumber(2000), 1000);
+    assert.equal(dexNumber(10000), 1000);
   });
 });
 
