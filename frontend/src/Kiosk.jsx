@@ -19,6 +19,7 @@ import TranslateButton from './components/TranslateButton';
 import './Kiosk.css';
 
 const isTopping = (item) => item.itemType?.toLowerCase() === 'topping';
+const PICKS_SECTION = "Today's Picks";
 const sectionId = (category) => `kiosk-section-${category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 // The confirmation screen resets itself for the next customer after this long.
 const CONFIRMATION_MS = 20000;
@@ -37,6 +38,7 @@ const PAYMENT_NOTES = {
 export default function Kiosk() {
   const toast = useToast();
   const menu = useResource(() => Api.menu({ availableOnly: true }), []);
+  const suggestions = useResource(() => Api.weatherSuggestions(), []);
   const [lines, setLines] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [editing, setEditing] = useState(null); // { item, index }; index -1 adds a new line
@@ -62,13 +64,18 @@ export default function Kiosk() {
       if (!map.has(item.category)) map.set(item.category, []);
       map.get(item.category).push(item);
     }
-    return [...map.entries()].map(([category, drinks]) => ({ category, drinks }));
-  }, [items]);
+    const result = [...map.entries()].map(([category, drinks]) => ({ category, drinks }));
+    // Use the full menu items so the customize dialog gets every field it needs.
+    const picks = (suggestions.data?.items ?? []).map((s) => items.find((i) => i.id === s.id)).filter(Boolean);
+    if (picks.length > 0) result.unshift({ category: PICKS_SECTION, drinks: picks });
+    return result;
+  }, [items, suggestions.data]);
 
   // Intro: in each column, tiles start stacked flush on the bottom edge (bottom tile on the floor,
   // the next one resting on top of it). Only the y position animates; x and rotation never change.
   useLayoutEffect(() => {
-    if (introPlayed.current || !menu.data || sections.length === 0) return;
+    // Waits for suggestions too, so their section doesn't pop in and shove the menu sideways.
+    if (introPlayed.current || !menu.data || suggestions.loading || sections.length === 0) return;
     introPlayed.current = true;
 
     const track = trackRef.current;
@@ -119,7 +126,7 @@ export default function Kiosk() {
       anims.forEach((a) => a.cancel());
       setIntro(false);
     });
-  }, [menu.data, sections]);
+  }, [menu.data, suggestions.loading, sections]);
 
   const totals = orderTotals(lines);
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);
