@@ -13,7 +13,7 @@ import {
   priceOrder,
   redeemDiscount,
 } from '../src/routes/orders.js';
-import { MAX_QUANTITY, MAX_TOPPING_COUNT } from '../../shared/orderRules.js';
+import { MAX_QUANTITY, MAX_TOPPING_COUNT, sizedPriceCents } from '../../shared/orderRules.js';
 
 const SAMPLE_MENU = [
   { id: 1, name: 'Classic Milk Tea', itemType: 'drink', priceCents: 525 },
@@ -466,14 +466,14 @@ describe('orders HTTP routes', () => {
 
     assert.equal(res.status, 201);
     const body = await res.json();
-    // (575 + 75*2) * 3 = 2175; tax = round(179.4375) = 179; discount = round(217.5) = 218; total = 2136
+    // Large: 575 + 75 = 650; (650 + 75*2) * 3 = 2400; tax = round(198) = 198; discount = 10% = 240; total = 2358
     assert.deepEqual(body, {
       id: 42,
-      subtotalCents: 2175,
-      taxCents: 179,
-      discountCents: 218,
+      subtotalCents: 2400,
+      taxCents: 198,
+      discountCents: 240,
       rewardCents: 0,
-      totalCents: 2136,
+      totalCents: 2358,
       paymentMethod: 'cash',
       pointsEarned: 0,
       pointsRedeemed: 0,
@@ -482,10 +482,10 @@ describe('orders HTTP routes', () => {
     });
 
     assert.deepEqual(recordedInserts, [
-      { table: 'orders', params: [1, 2136, 'Cash', 7, 218, null, 0, 0, 0] },
+      { table: 'orders', params: [1, 2358, 'Cash', 7, 240, null, 0, 0, 0] },
       {
         table: 'order_items',
-        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 575],
+        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 650],
       },
       // 2 scoops on 3 drinks = quantity 6, linked to parent order_item_id 101
       {
@@ -580,5 +580,18 @@ describe('orders HTTP routes', () => {
     assert.equal(res.status, 409);
     assert.match((await res.json()).error, /Menu item #1 is no longer available/);
     assert.equal(recordedInserts.length, 0);
+  });
+});
+
+describe('sizedPriceCents', () => {
+  it('treats the menu price as Medium and adjusts Small and Large', () => {
+    assert.equal(sizedPriceCents(525, 'S'), 475);
+    assert.equal(sizedPriceCents(525, 'M'), 525);
+    assert.equal(sizedPriceCents(525, 'L'), 600);
+  });
+
+  it('prices each size differently in a real order', () => {
+    const subtotal = (size) => priceOrder([{ ...validLine(), size }], SAMPLE_MENU).subtotalCents;
+    assert.deepEqual([subtotal('S'), subtotal('M'), subtotal('L')], [475, 525, 600]);
   });
 });

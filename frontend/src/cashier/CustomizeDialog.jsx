@@ -4,7 +4,7 @@ import { Segmented } from '../components/Segmented';
 import { Stepper } from '../components/Stepper';
 import { money } from '../format';
 import {
-  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES, SUGAR_LEVELS,
+  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, SIZES, SUGAR_LEVELS, sizedPriceCents,
 } from '../../../shared/orderRules.js';
 import { lineCents } from './order';
 
@@ -56,7 +56,12 @@ export default function CustomizeDialog({ item, toppings, existing, onSave, onCl
 
         <fieldset>
           <legend>Size</legend>
-          <Segmented label="Size" options={SIZES} value={size} onChange={setSize} />
+          <Segmented
+            label="Size"
+            options={SIZES.map((s) => ({ value: s.value, label: `${s.label} ${money(sizedPriceCents(item.priceCents, s.value))}` }))}
+            value={size}
+            onChange={setSize}
+          />
         </fieldset>
 
         <fieldset>

@@ -5,11 +5,16 @@ export const TAX_RATE = 0.0825;
 
 export const ITEM_TYPES = ['drink', 'topping'];
 
+// A drink's menu price is its Medium price; the other sizes adjust it by deltaCents.
 export const SIZES = [
-  { value: 'S', label: 'Small' },
-  { value: 'M', label: 'Medium' },
-  { value: 'L', label: 'Large' },
+  { value: 'S', label: 'Small', deltaCents: -50 },
+  { value: 'M', label: 'Medium', deltaCents: 0 },
+  { value: 'L', label: 'Large', deltaCents: 75 },
 ];
+
+/** Price of one drink (without add-ons) in the given size. */
+export const sizedPriceCents = (menuPriceCents, size) => Math.max(0,
+  menuPriceCents + (SIZES.find((s) => s.value === size)?.deltaCents ?? 0));
 
 // Both go in 25% steps: ice tops out at 100%, sugar at 150%.
 const percentSteps = (max) => Array.from({ length: max / 25 + 1 }, (_, i) => `${i * 25}%`);

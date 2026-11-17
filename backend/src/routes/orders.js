@@ -5,7 +5,7 @@ import { claimRewardAccount, requireEmail } from './rewards.js';
 import { escapeHtml, sendEmail } from '../email.js';
 import {
   ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, POINTS_PER_REWARD, REWARD_CENTS, SIZES,
-  SUGAR_LEVELS, TAX_RATE, pointsForPayment,
+  SUGAR_LEVELS, TAX_RATE, pointsForPayment, sizedPriceCents,
 } from '../../../shared/orderRules.js';
 
 // Active, in-window, not-exhausted code -> discount row, or null. `db` is the pool or a transaction client.
@@ -113,9 +113,10 @@ export function priceOrder(lines, menuRows, discount = null) {
   const priced = lines.map((line) => {
     const drink = find(line.menuItemId, false);
     const toppings = line.toppings.map((t) => ({ ...t, item: find(t.menuItemId, true) }));
-    const unit = drink.priceCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
+    const drinkCents = sizedPriceCents(drink.priceCents, line.size);
+    const unit = drinkCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
     subtotalCents += unit * line.quantity;
-    return { ...line, drink, toppings };
+    return { ...line, drink, drinkCents, toppings };
   });
   const taxCents = Math.round(subtotalCents * TAX_RATE);
   const discountCents = discountAmount(discount, subtotalCents);
@@ -362,7 +363,7 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
       for (const line of priced) {
         const snapshot = `${line.drink.name} (${line.size}, ${line.ice} ice, ${line.sugar} sugar)`;
         const { rows: [{ id: parentId }] } = await client.query(insertLine,
-          [orderId, line.drink.id, null, snapshot, line.quantity, line.drink.priceCents]);
+          [orderId, line.drink.id, null, snapshot, line.quantity, line.drinkCents]);
         // One row per add-on, repeats folded into quantity (2 scoops on 3 drinks = 6).
         for (const t of line.toppings) {
           await client.query(insertLine,

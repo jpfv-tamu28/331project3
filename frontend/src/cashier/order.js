@@ -1,10 +1,10 @@
 // Order-line helpers for the cashier and kiosk screens.
 // All money is in cents; the server re-prices every order from the database, using the same math.
-import { TAX_RATE } from '../../../shared/orderRules.js';
+import { TAX_RATE, sizedPriceCents } from '../../../shared/orderRules.js';
 
 /** Price of one drink with its add-ons, before quantity. */
 export function unitCents(line) {
-  return line.item.priceCents
+  return sizedPriceCents(line.item.priceCents, line.size)
     + line.toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
 }
 
