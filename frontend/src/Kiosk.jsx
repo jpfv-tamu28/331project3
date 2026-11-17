@@ -315,6 +315,8 @@ export default function Kiosk() {
           placing={placing}
           rewards={{
             phone: rewardPhone,
+            // A half-typed number would silently earn nothing, so ordering waits until it's 10 digits or empty.
+            phoneIncomplete: rewardPhone.length > 0 && rewardPhone.length < 10,
             onPhoneChange: (value) => { setRewardPhone(value); setRewardPoints(null); setRedeem(0); },
             points: rewardPoints,
             onPoints: setRewardPoints,

@@ -12,6 +12,7 @@ export default function RewardsBox({ phone, onPhoneChange, points, onPoints, red
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const valid = normalizePhone(phone) !== null;
+  const partial = phone.length > 0 && !valid;
 
   const check = async () => {
     if (!valid || checking) return;
@@ -39,10 +40,11 @@ export default function RewardsBox({ phone, onPhoneChange, points, onPoints, red
           inputMode="tel"
           autoComplete="tel"
           placeholder="Phone number"
+          maxLength={10}
           value={phone}
-          aria-invalid={error ? 'true' : undefined}
-          aria-describedby={error ? 'kiosk-rewards-error' : undefined}
-          onChange={(e) => onPhoneChange(e.target.value)}
+          aria-invalid={error || partial ? 'true' : undefined}
+          aria-describedby={error ? 'kiosk-rewards-error' : partial ? 'kiosk-rewards-partial' : undefined}
+          onChange={(e) => onPhoneChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
           onKeyDown={(e) => e.key === 'Enter' && check()}
         />
         <button type="button" className="btn btn-secondary" onClick={check} disabled={!valid || checking}>
@@ -50,6 +52,11 @@ export default function RewardsBox({ phone, onPhoneChange, points, onPoints, red
         </button>
       </div>
       {error && <p id="kiosk-rewards-error" role="alert" className="kiosk-rewards-error">{error}</p>}
+      {partial && !error && (
+        <p id="kiosk-rewards-partial" className="kiosk-rewards-error">
+          Enter all 10 digits, or clear it to order without rewards.
+        </p>
+      )}
       {points !== null && (
         <div className="kiosk-rewards-balance" role="status">
           <span>{points.toLocaleString()} points</span>

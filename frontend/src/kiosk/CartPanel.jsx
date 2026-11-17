@@ -96,7 +96,7 @@ export default function CartPanel({
           type="button"
           className="btn btn-primary btn-lg btn-block kiosk-place"
           onClick={onPlaceOrder}
-          disabled={lines.length === 0 || placing}
+          disabled={lines.length === 0 || placing || rewards.phoneIncomplete}
         >
           {placing ? 'Placing order…' : `Place Order · ${money(totals.total)}`}
         </button>
