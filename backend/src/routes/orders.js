@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { pool, withTransaction } from '../db.js';
 import { asyncRoute, HttpError, requireId } from '../http.js';
+import { claimRewardAccount, requireEmail } from './rewards.js';
+import { escapeHtml, sendEmail } from '../email.js';
 import {
-  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, SIZES, SUGAR_LEVELS, TAX_RATE,
+  ICE_LEVELS, MAX_QUANTITY, MAX_TOPPING_COUNT, PAYMENT_METHODS, POINTS_PER_REWARD, REWARD_CENTS, SIZES,
+  SUGAR_LEVELS, TAX_RATE, pointsForPayment, sizedPriceCents,
 } from '../../../shared/orderRules.js';
 
 // Active, in-window, not-exhausted code -> discount row, or null. `db` is the pool or a transaction client.
@@ -86,7 +89,13 @@ export function parseOrderInput(body = {}) {
   const discountCode = typeof body?.discountCode === 'string' && body.discountCode.trim() !== ''
     ? body.discountCode
     : null;
-  return { employeeId, lines, paymentKey, paymentMethod, discountCode };
+  const rewardEmail = body?.rewardEmail == null || body.rewardEmail === '' ? null : requireEmail(body.rewardEmail);
+  const redeemRewards = body?.redeemRewards ?? 0;
+  if (!Number.isInteger(redeemRewards) || redeemRewards < 0) {
+    throw new HttpError(400, 'Rewards to redeem must be a whole number.');
+  }
+  if (redeemRewards > 0 && !rewardEmail) throw new HttpError(400, 'Enter your email to redeem rewards.');
+  return { employeeId, lines, paymentKey, paymentMethod, discountCode, rewardEmail, redeemRewards };
 }
 
 export function priceOrder(lines, menuRows, discount = null) {
@@ -104,9 +113,10 @@ export function priceOrder(lines, menuRows, discount = null) {
   const priced = lines.map((line) => {
     const drink = find(line.menuItemId, false);
     const toppings = line.toppings.map((t) => ({ ...t, item: find(t.menuItemId, true) }));
-    const unit = drink.priceCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
+    const drinkCents = sizedPriceCents(drink.priceCents, line.size);
+    const unit = drinkCents + toppings.reduce((sum, t) => sum + t.item.priceCents * t.count, 0);
     subtotalCents += unit * line.quantity;
-    return { ...line, drink, toppings };
+    return { ...line, drink, drinkCents, toppings };
   });
   const taxCents = Math.round(subtotalCents * TAX_RATE);
   const discountCents = discountAmount(discount, subtotalCents);
@@ -131,6 +141,52 @@ export async function deductOrderInventory(client, orderId) {
      WHERE i.inventory_id = used.inventory_id`,
     [orderId],
   );
+}
+
+const dollars = (cents) => `$${(cents / 100).toFixed(2)}`;
+
+/** Builds the receipt email body. `items` are order_items rows; add-ons have a parentId. */
+export function receiptHtml(order, items) {
+  const rows = items.map((i) => `
+    <tr>
+      <td style="padding:4px 0;${i.parentId ? 'padding-left:16px;color:#666' : ''}">${i.quantity} × ${escapeHtml(i.name)}</td>
+      <td style="padding:4px 0;text-align:right">${dollars(i.quantity * i.unitPriceCents)}</td>
+    </tr>`).join('');
+  const discount = order.discountCents > 0
+    ? `<tr><td>Discount</td><td style="text-align:right">-${dollars(order.discountCents)}</td></tr>`
+    : '';
+  const reward = order.rewardCents > 0
+    ? `<tr><td>Rewards (${order.pointsRedeemed.toLocaleString('en-US')} points)</td><td style="text-align:right">-${dollars(order.rewardCents)}</td></tr>`
+    : '';
+  // pointsBalance is null when the order had no rewards email.
+  const points = order.pointsBalance == null ? '' : `
+  <p style="padding:12px;background:#f6f1ea;border-radius:8px">
+    You earned <strong>${order.pointsEarned.toLocaleString('en-US')} points</strong> on this order.<br>
+    Rewards balance: <strong>${order.pointsBalance.toLocaleString('en-US')} points</strong>
+    (every ${POINTS_PER_REWARD.toLocaleString('en-US')} points = ${dollars(REWARD_CENTS)} off)
+  </p>`;
+  return `
+<div style="font-family:sans-serif;max-width:480px">
+  <h1 style="font-size:22px">Thanks for your order!</h1>
+  <p style="font-size:18px"><strong>Order #${order.id}</strong></p>
+  <table style="width:100%;border-collapse:collapse">${rows}
+    ${discount}
+    ${reward}
+    <tr><td style="padding-top:8px;border-top:1px solid #ddd"><strong>Total (with tax)</strong></td>
+        <td style="padding-top:8px;border-top:1px solid #ddd;text-align:right"><strong>${dollars(order.totalCents)}</strong></td></tr>
+  </table>${points}
+  <p>We'll call your number when your drinks are ready.</p>
+</div>`;
+}
+
+async function emailReceipt(db, order, email) {
+  const { rows: items } = await db.query(
+    `SELECT parent_order_item_id AS "parentId", item_name_snapshot AS name,
+            quantity, unit_price_cents AS "unitPriceCents"
+     FROM order_items WHERE order_id = $1 ORDER BY order_item_id`,
+    [order.id],
+  );
+  await sendEmail({ to: email, subject: `Your Boba Bops receipt (order #${order.id})`, html: receiptHtml(order, items) });
 }
 
 export function createOrderRoutes({ db = pool, runTransaction = withTransaction } = {}) {
@@ -248,10 +304,13 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
   }));
 
   // POST /api/orders { employeeId?, items: [{ menuItemId, size, ice, sugar, quantity, toppings: [{ menuItemId, count }] }],
-  //                    discountCode?, paymentMethod }
+  //                    discountCode?, paymentMethod, rewardEmail?, redeemRewards? }
+  // With rewardEmail, the order earns points and the receipt (with points) is emailed afterwards.
   // Prices come from the database, not the request, so the total can't be tampered with.
   router.post('/', asyncRoute(async (req, res) => {
-    const { employeeId, lines, paymentKey, paymentMethod, discountCode } = parseOrderInput(req.body);
+    const {
+      employeeId, lines, paymentKey, paymentMethod, discountCode, rewardEmail, redeemRewards,
+    } = parseOrderInput(req.body);
 
     const order = await runTransaction(async (client) => {
       const ids = [...new Set(lines.flatMap((l) => [l.menuItemId, ...l.toppings.map((t) => t.menuItemId)]))];
@@ -265,17 +324,38 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
         ? await redeemDiscount(client, discountCode, subtotalCents)
         : null;
       const discountCents = discountAmount(discount, subtotalCents);
-      const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+      const dueCents = Math.max(0, subtotalCents + taxCents - discountCents);
+
+      const account = rewardEmail ? await claimRewardAccount(client, rewardEmail) : null;
+      const pointsRedeemed = redeemRewards * POINTS_PER_REWARD;
+      const rewardCents = redeemRewards * REWARD_CENTS;
+      if (account && pointsRedeemed > account.points) {
+        throw new HttpError(400, `Not enough points: you have ${account.points}, this needs ${pointsRedeemed}.`);
+      }
+      if (rewardCents > dueCents) throw new HttpError(400, "Rewards can't be more than the order total.");
+      const totalCents = dueCents - rewardCents;
+      const pointsEarned = account ? pointsForPayment(totalCents) : 0;
 
       // order_id is not SERIAL, so new IDs are MAX + 1 under a table lock.
       await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
       const { rows: [{ id: orderId }] } = await client.query(
         `INSERT INTO orders (order_id, employee_id, status, created_at, total_cents, payment_method,
-                             discount_code_id, discount_cents)
-         VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3, $4, $5)
+                             discount_code_id, discount_cents, reward_account_id, points_earned,
+                             points_redeemed, reward_cents)
+         VALUES ((SELECT COALESCE(MAX(order_id), 0) + 1 FROM orders), $1, 'closed', LOCALTIMESTAMP, $2, $3, $4, $5,
+                 $6, $7, $8, $9)
          RETURNING order_id AS id`,
-        [employeeId, totalCents, paymentMethod, discount?.id ?? null, discountCents],
+        [employeeId, totalCents, paymentMethod, discount?.id ?? null, discountCents,
+          account?.id ?? null, pointsEarned, pointsRedeemed, rewardCents],
       );
+      let pointsBalance = null;
+      if (account) {
+        const { rows: [updated] } = await client.query(
+          'UPDATE reward_accounts SET points = points - $2 + $3 WHERE reward_account_id = $1 RETURNING points',
+          [account.id, pointsRedeemed, pointsEarned],
+        );
+        pointsBalance = updated.points;
+      }
 
       const insertLine = `INSERT INTO order_items
         (order_id, menu_item_id, parent_order_item_id, item_name_snapshot, quantity, unit_price_cents)
@@ -283,7 +363,7 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
       for (const line of priced) {
         const snapshot = `${line.drink.name} (${line.size}, ${line.ice} ice, ${line.sugar} sugar)`;
         const { rows: [{ id: parentId }] } = await client.query(insertLine,
-          [orderId, line.drink.id, null, snapshot, line.quantity, line.drink.priceCents]);
+          [orderId, line.drink.id, null, snapshot, line.quantity, line.drinkCents]);
         // One row per add-on, repeats folded into quantity (2 scoops on 3 drinks = 6).
         for (const t of line.toppings) {
           await client.query(insertLine,
@@ -291,10 +371,23 @@ export function createOrderRoutes({ db = pool, runTransaction = withTransaction 
         }
       }
       await deductOrderInventory(client, orderId);
-      return { id: orderId, subtotalCents, taxCents, discountCents, totalCents, paymentMethod: paymentKey };
+      return {
+        id: orderId, subtotalCents, taxCents, discountCents, rewardCents, totalCents, paymentMethod: paymentKey,
+        pointsEarned, pointsRedeemed, pointsBalance,
+      };
     });
 
-    res.status(201).json(order);
+    // After the commit: a failed email must not undo a paid order, so it's only reported.
+    let receiptSent = false;
+    if (rewardEmail) {
+      try {
+        await emailReceipt(db, order, rewardEmail);
+        receiptSent = true;
+      } catch (err) {
+        console.error(`[WARN] Receipt for order #${order.id} not sent:`, err.message);
+      }
+    }
+    res.status(201).json({ ...order, receiptSent });
   }));
 
   return router;

@@ -82,12 +82,14 @@ All routes are under `/api`. Errors come back as `{ "error": "message" }`.
 | GET / POST | `/orders/discounts` | list all discount codes or create a new one (requires OAuth) |
 | GET | `/orders/discounts/:code` | validates a discount code |
 | POST | `/orders` | see below |
+| GET | `/rewards?email=` | `{ points }` for a rewards email (0 if it has no account yet) |
 | GET | `/reports` | list of range reports (requires OAuth) |
 | GET | `/reports/:key?from=&to=` | `daily-sales`, `top-items`, `sales-by-hour`, `category-sales`, `employee-performance` (requires OAuth) |
 | GET | `/reports/x-report?date=` | hourly totals for one day (requires OAuth) |
 | GET | `/reports/product-usage?from=&to=` | ingredient usage from recipes (requires OAuth) |
 
-`POST /orders` takes `{ employeeId?, paymentMethod, discountCode?, items: [{ menuItemId, size: S|M|L, ice, sugar, quantity, toppings: [{ menuItemId, count }] }] }`.
+`POST /orders` takes `{ employeeId?, paymentMethod, discountCode?, rewardEmail?, redeemRewards?, items: [{ menuItemId, size: S|M|L, ice, sugar, quantity, toppings: [{ menuItemId, count }] }] }`.
+With `rewardEmail`, the order earns 10 points per $1 paid, `redeemRewards` spends 1,000 points per $1 off, and the receipt (with points) is emailed through Resend afterwards; the response's `receiptSent` says whether that worked.
 The server looks up every price in the database and computes subtotal, 8.25% tax and discount itself, so totals
 can't be changed from the browser. The order and its lines are written in one transaction.
 

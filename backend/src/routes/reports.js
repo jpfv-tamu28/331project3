@@ -51,6 +51,15 @@ export const REPORTS = {
           WHERE ${O_RANGE}
           GROUP BY e.employee_id, e.name, e.role ORDER BY orders DESC`,
   },
+  rewards: {
+    title: 'Rewards',
+    sql: `SELECT to_char(DATE(created_at), 'YYYY-MM-DD') AS day, COUNT(*) AS rewards_orders,
+                 COUNT(DISTINCT reward_account_id) AS customers,
+                 SUM(points_earned) AS points_earned, SUM(points_redeemed) AS points_redeemed,
+                 ROUND(SUM(reward_cents) / 100.0, 2) AS rewards_given_dollars
+          FROM orders WHERE ${RANGE} AND reward_account_id IS NOT NULL
+          GROUP BY DATE(created_at) ORDER BY DATE(created_at)`,
+  },
 };
 
 // "revenue_dollars" -> "Revenue", "quantity_sold" -> "Quantity Sold"

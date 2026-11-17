@@ -399,6 +399,11 @@ select.field {
   color: var(--subtle);
 }
 
+.badge-editing {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 .badge-alert {
   background: var(--alert-bg);
   color: var(--alert-fg);
@@ -558,7 +563,7 @@ select.field {
   align-items: center;
   gap: 16px;
   width: 100%;
-  padding: 10px 20px;
+  padding: 6px 20px;
   border: 0;
   border-bottom: 1px solid var(--row-line);
   background: var(--surface);
@@ -573,13 +578,24 @@ select.field {
   background: var(--row-pressed);
 }
 
+/* Name and details share one line (user study: lists took too much scrolling). */
 .dense-row-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .dense-row-text strong {
-  display: block;
+  flex: none;
+}
+
+.dense-row-text span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dense-row-text span,
@@ -592,8 +608,10 @@ select.field {
   font-variant-numeric: tabular-nums;
 }
 
-.dense-row-value strong {
-  display: block;
+.dense-row-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .edit-chip {
@@ -667,6 +685,11 @@ select.field {
 
 .modal-tone.tone-warning {
   background: var(--warning);
+}
+
+.modal-tone.tone-accent {
+  height: 6px;
+  background: var(--accent);
 }
 
 .modal-tone.tone-error {

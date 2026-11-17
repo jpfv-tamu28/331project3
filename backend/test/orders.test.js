@@ -13,7 +13,7 @@ import {
   priceOrder,
   redeemDiscount,
 } from '../src/routes/orders.js';
-import { MAX_QUANTITY, MAX_TOPPING_COUNT } from '../../shared/orderRules.js';
+import { MAX_QUANTITY, MAX_TOPPING_COUNT, sizedPriceCents } from '../../shared/orderRules.js';
 
 const SAMPLE_MENU = [
   { id: 1, name: 'Classic Milk Tea', itemType: 'drink', priceCents: 525 },
@@ -357,6 +357,7 @@ describe('orders HTTP routes', () => {
   let baseUrl;
   let recordedInserts;
   let availableMenu;
+  let rewardPoints;
 
   before(async () => {
     availableMenu = SAMPLE_MENU;
@@ -374,6 +375,13 @@ describe('orders HTTP routes', () => {
         if (sql.startsWith('UPDATE discount_codes')) {
           return { rowCount: 1 };
         }
+        if (sql.startsWith('INSERT INTO reward_accounts')) return { rows: [] };
+        if (sql.includes('FROM reward_accounts')) return { rows: [{ id: 5, points: rewardPoints }] };
+        if (sql.startsWith('UPDATE reward_accounts')) {
+          recordedInserts.push({ table: 'reward_accounts', params });
+          return { rows: [{ points: rewardPoints - params[1] + params[2] }] };
+        }
+        if (sql.includes('FROM order_items WHERE order_id')) return { rows: [] };
         if (sql.startsWith('LOCK TABLE')) {
           return { rows: [] };
         }
@@ -458,21 +466,26 @@ describe('orders HTTP routes', () => {
 
     assert.equal(res.status, 201);
     const body = await res.json();
-    // (575 + 75*2) * 3 = 2175; tax = round(179.4375) = 179; discount = round(217.5) = 218; total = 2136
+    // Large: 575 + 75 = 650; (650 + 75*2) * 3 = 2400; tax = round(198) = 198; discount = 10% = 240; total = 2358
     assert.deepEqual(body, {
       id: 42,
-      subtotalCents: 2175,
-      taxCents: 179,
-      discountCents: 218,
-      totalCents: 2136,
+      subtotalCents: 2400,
+      taxCents: 198,
+      discountCents: 240,
+      rewardCents: 0,
+      totalCents: 2358,
       paymentMethod: 'cash',
+      pointsEarned: 0,
+      pointsRedeemed: 0,
+      pointsBalance: null,
+      receiptSent: false,
     });
 
     assert.deepEqual(recordedInserts, [
-      { table: 'orders', params: [1, 2136, 'Cash', 7, 218] },
+      { table: 'orders', params: [1, 2358, 'Cash', 7, 240, null, 0, 0, 0] },
       {
         table: 'order_items',
-        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 575],
+        params: [42, 2, null, 'Taro Milk Tea (L, 50% ice, 150% sugar)', 3, 650],
       },
       // 2 scoops on 3 drinks = quantity 6, linked to parent order_item_id 101
       {
@@ -503,6 +516,57 @@ describe('orders HTTP routes', () => {
     assert.equal(recordedInserts.length, 0);
   });
 
+  const orderWithRewards = (extra) => fetch(`${baseUrl}/api/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: [validLine()], ...extra }),
+  });
+
+  it('earns 10 points per dollar paid when an email is given', async () => {
+    recordedInserts = [];
+    rewardPoints = 0;
+    // 525 + tax 43 = 568 paid -> 56 points
+    const res = await orderWithRewards({ rewardEmail: ' Guest@TAMU.edu ' });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.pointsEarned, 56);
+    assert.equal(body.pointsBalance, 56);
+    assert.deepEqual(recordedInserts[0].params.slice(-4), [5, 56, 0, 0]);
+    assert.deepEqual(recordedInserts.find((r) => r.table === 'reward_accounts').params, [5, 0, 56]);
+  });
+
+  it('takes $1 off per 1,000 points redeemed and earns on what is still paid', async () => {
+    recordedInserts = [];
+    rewardPoints = 2500;
+    const res = await orderWithRewards({ rewardEmail: 'guest@tamu.edu', redeemRewards: 2 });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    // 568 - 200 = 368 paid -> 36 points; 2500 - 2000 + 36 = 536
+    assert.equal(body.rewardCents, 200);
+    assert.equal(body.totalCents, 368);
+    assert.equal(body.pointsEarned, 36);
+    assert.equal(body.pointsBalance, 536);
+    assert.deepEqual(recordedInserts[0].params.slice(-4), [5, 36, 2000, 200]);
+  });
+
+  it('rejects redemptions the customer cannot afford or that exceed the total', async () => {
+    recordedInserts = [];
+    const cases = [
+      [{ rewardPoints: 500, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 1 } }, /Not enough points/],
+      [{ rewardPoints: 10000, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 6 } }, /more than the order total/],
+      [{ rewardPoints: 5000, body: { redeemRewards: 1 } }, /email to redeem/],
+      [{ rewardPoints: 0, body: { rewardEmail: 'not-an-email' } }, /valid email/],
+      [{ rewardPoints: 5000, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 1.5 } }, /whole number/],
+    ];
+    for (const [{ rewardPoints: points, body }, message] of cases) {
+      rewardPoints = points;
+      const res = await orderWithRewards(body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.match((await res.json()).error, message);
+    }
+    assert.equal(recordedInserts.length, 0);
+  });
+
   it('returns 409 when a requested item is no longer available', async () => {
     recordedInserts = [];
     availableMenu = SAMPLE_MENU.filter((m) => m.id !== 1);
@@ -516,5 +580,18 @@ describe('orders HTTP routes', () => {
     assert.equal(res.status, 409);
     assert.match((await res.json()).error, /Menu item #1 is no longer available/);
     assert.equal(recordedInserts.length, 0);
+  });
+});
+
+describe('sizedPriceCents', () => {
+  it('treats the menu price as Medium and adjusts Small and Large', () => {
+    assert.equal(sizedPriceCents(525, 'S'), 475);
+    assert.equal(sizedPriceCents(525, 'M'), 525);
+    assert.equal(sizedPriceCents(525, 'L'), 600);
+  });
+
+  it('prices each size differently in a real order', () => {
+    const subtotal = (size) => priceOrder([{ ...validLine(), size }], SAMPLE_MENU).subtotalCents;
+    assert.deepEqual([subtotal('S'), subtotal('M'), subtotal('L')], [475, 525, 600]);
   });
 });

@@ -5,6 +5,7 @@ import { money, percent } from '../format';
 import { MAX_QUANTITY, PAYMENT_METHODS, SIZES, TAX_RATE } from '../../../shared/orderRules.js';
 import { customizationSummary, lineCents } from '../cashier/order';
 import DrinkArt from './DrinkArt';
+import RewardsBox from './RewardsBox';
 
 const SIZE_NAMES = Object.fromEntries(SIZES.map((s) => [s.value, s.label]));
 
@@ -14,6 +15,7 @@ const SIZE_NAMES = Object.fromEntries(SIZES.map((s) => [s.value, s.label]));
  */
 export default function CartPanel({
   open, onClose, lines, totals, payment, onPaymentChange, onEdit, onQuantity, onRemove, onPlaceOrder, placing,
+  rewards,
 }) {
   const headingRef = useRef(null);
 
@@ -60,14 +62,16 @@ export default function CartPanel({
                         max={MAX_QUANTITY}
                         onChange={(q) => onQuantity(index, q)}
                       />
-                      <button type="button" className="kiosk-link-btn" onClick={() => onEdit(index)}
-                        aria-label={`Edit ${name}`}>
-                        Edit
-                      </button>
-                      <button type="button" className="kiosk-link-btn" onClick={() => onRemove(index)}
-                        aria-label={`Remove ${name}`}>
-                        Remove
-                      </button>
+                      <span className="kiosk-line-btns">
+                        <button type="button" className="kiosk-line-btn" onClick={() => onEdit(index)}
+                          aria-label={`Edit ${name}`}>
+                          <span aria-hidden="true">✎</span> Edit
+                        </button>
+                        <button type="button" className="kiosk-line-btn kiosk-line-btn-remove" onClick={() => onRemove(index)}
+                          aria-label={`Remove ${name}`}>
+                          <span aria-hidden="true">✕</span> Remove
+                        </button>
+                      </span>
                     </div>
                   </div>
                   <span className="kiosk-cart-price">{money(lineCents(line))}</span>
@@ -82,8 +86,10 @@ export default function CartPanel({
         <dl className="totals">
           <div><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div>
           <div><dt>Tax ({percent(TAX_RATE)})</dt><dd>{money(totals.tax)}</dd></div>
+          {totals.reward > 0 && <div><dt>Rewards</dt><dd>-{money(totals.reward)}</dd></div>}
           <div className="grand"><dt>Total</dt><dd>{money(totals.total)}</dd></div>
         </dl>
+        <RewardsBox {...rewards} />
         <div>
           <p className="kiosk-cart-label" id="kiosk-pay-label">How would you like to pay?</p>
           <Segmented label="Payment method" options={PAYMENT_METHODS} value={payment} onChange={onPaymentChange} />
@@ -92,7 +98,7 @@ export default function CartPanel({
           type="button"
           className="btn btn-primary btn-lg btn-block kiosk-place"
           onClick={onPlaceOrder}
-          disabled={lines.length === 0 || placing}
+          disabled={lines.length === 0 || placing || rewards.emailIncomplete}
         >
           {placing ? 'Placing order…' : `Place Order · ${money(totals.total)}`}
         </button>

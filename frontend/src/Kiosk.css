@@ -60,7 +60,7 @@
   color-scheme: dark;
 }
 
-:root[data-kiosk-theme='contrast'] :is(.kiosk-tile, .kiosk-icon-btn, .kiosk-cart-thumb, .segmented button, .btn, .stepper button) {
+:root[data-kiosk-theme='contrast'] :is(.kiosk-tile, .kiosk-icon-btn, .kiosk-line-btn, .kiosk-cart-thumb, .segmented button, .btn, .stepper button) {
   border: 2px solid var(--text);
 }
 
@@ -266,11 +266,20 @@
   flex: none;
   scroll-snap-align: start;
   scroll-margin-left: 24px;
+}
 
+/* A divider between categories (user study: sections blended together). */
+.kiosk-section + .kiosk-section {
+  padding-left: 48px;
+  border-left: 2px solid var(--line);
 }
 
 .kiosk-section h2 {
   height: 48px;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 4px;
+  text-underline-offset: 8px;
   font-size: calc(26px * var(--kiosk-text, 1));
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -490,9 +499,41 @@
 
 .kiosk-cart-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* Edit and Remove stay together; if the row is too narrow they move under the stepper as a pair. */
+.kiosk-line-btns {
+  display: flex;
+  gap: 8px;
+}
+
+/* Real buttons, not text links: the user study found Edit and Remove too small to see or tap. */
+.kiosk-line-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line-strong);
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: calc(15px * var(--kiosk-text, 1));
+  font-weight: 700;
+}
+
+.kiosk-line-btn:active {
+  transform: scale(0.97);
+}
+
+.kiosk-line-btn-remove {
+  border-color: var(--error);
+  color: var(--error);
 }
 
 .kiosk-link-btn {
@@ -521,6 +562,53 @@
   gap: 14px;
   padding: 16px 20px 20px;
   border-top: 1px solid var(--line);
+}
+
+.kiosk-rewards-row {
+  display: flex;
+  gap: 8px;
+}
+
+.kiosk-rewards-row .field {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  font-size: calc(15px * var(--kiosk-text, 1));
+}
+
+.kiosk-rewards-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+.kiosk-rewards-redeem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kiosk-rewards-hint {
+  font-weight: 400;
+  color: var(--subtle);
+}
+
+.kiosk-rewards-info {
+  margin-top: 6px;
+  font-size: calc(13px * var(--kiosk-text, 1));
+}
+
+.kiosk-rewards-error {
+  margin-top: 6px;
+  color: var(--error);
+}
+
+.kiosk-done-points {
+  font-weight: 700;
 }
 
 .kiosk-cart-label {
@@ -837,4 +925,16 @@
   width: 1.25rem;
   height: 1.25rem;
   flex-shrink: 0;
+}
+
+/* Bigger main button in the drink dialog (user study: "Add to Order" was hard to find and read). */
+.kiosk-modal.customize-dialog .modal-actions .btn-primary {
+  min-height: 60px;
+  padding: 0 36px;
+  font-size: calc(19px * var(--kiosk-text, 1));
+}
+
+.kiosk-modal .badge-editing {
+  padding: 6px 12px;
+  font-size: calc(13px * var(--kiosk-text, 1));
 }
