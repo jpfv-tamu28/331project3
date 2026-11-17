@@ -7,7 +7,7 @@ import { useToast } from './components/ToastProvider';
 import { money } from './format';
 import CustomizeDialog from './cashier/CustomizeDialog';
 import { orderTotals, toOrderRequest } from './cashier/order';
-import { REWARD_CENTS, maxRewards, normalizePhone } from '../../shared/orderRules.js';
+import { REWARD_CENTS, maxRewards, normalizeEmail } from '../../shared/orderRules.js';
 import CartPanel from './kiosk/CartPanel';
 import DrinkArt from './kiosk/DrinkArt';
 import OrderBuddy from './kiosk/OrderBuddy';
@@ -47,7 +47,7 @@ export default function Kiosk() {
   const [payment, setPayment] = useState('card');
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(null); // order returned by the server
-  const [rewardPhone, setRewardPhone] = useState('');
+  const [rewardEmail, setRewardEmail] = useState('');
   const [rewardPoints, setRewardPoints] = useState(null); // balance once looked up
   const [redeem, setRedeem] = useState(0); // $1 rewards the customer chose to use
   const [activeSection, setActiveSection] = useState(null);
@@ -209,7 +209,7 @@ export default function Kiosk() {
     setPlaced(null);
     setCartOpen(false);
     setPayment('card');
-    setRewardPhone('');
+    setRewardEmail('');
     setRewardPoints(null);
     setRedeem(0);
     trackRef.current?.scrollTo({ left: 0 });
@@ -228,7 +228,7 @@ export default function Kiosk() {
       const order = await Api.createOrder({
         items: toOrderRequest(lines),
         paymentMethod: payment,
-        rewardPhone: normalizePhone(rewardPhone),
+        rewardEmail: normalizeEmail(rewardEmail),
         redeemRewards: redeemCount,
       });
       setPlaced(order);
@@ -314,10 +314,10 @@ export default function Kiosk() {
           onPlaceOrder={placeOrder}
           placing={placing}
           rewards={{
-            phone: rewardPhone,
-            // A half-typed number would silently earn nothing, so ordering waits until it's 10 digits or empty.
-            phoneIncomplete: rewardPhone.length > 0 && rewardPhone.length < 10,
-            onPhoneChange: (value) => { setRewardPhone(value); setRewardPoints(null); setRedeem(0); },
+            email: rewardEmail,
+            // A half-typed email would silently get no points or receipt, so ordering waits until it's valid or empty.
+            emailIncomplete: rewardEmail.trim() !== '' && !normalizeEmail(rewardEmail),
+            onEmailChange: (value) => { setRewardEmail(value); setRewardPoints(null); setRedeem(0); },
             points: rewardPoints,
             onPoints: setRewardPoints,
             redeem: redeemCount,
@@ -405,6 +405,13 @@ export default function Kiosk() {
               You earned {placed.pointsEarned.toLocaleString()} points
               {placed.rewardCents > 0 && ` and saved ${money(placed.rewardCents)}`}.
               {' '}Balance: {placed.pointsBalance.toLocaleString()} points.
+            </p>
+          )}
+          {placed.pointsBalance != null && (
+            <p className="kiosk-done-receipt">
+              {placed.receiptSent
+                ? `Your receipt is on its way to ${normalizeEmail(rewardEmail)}.`
+                : "We couldn't email your receipt this time, but your points were saved."}
             </p>
           )}
           <OrderBuddy orderId={placed.id} />

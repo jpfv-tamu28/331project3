@@ -2,24 +2,24 @@ import { useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { Stepper } from '../components/Stepper';
 import { money } from '../format';
-import { POINTS_PER_DOLLAR, POINTS_PER_REWARD, REWARD_CENTS, normalizePhone } from '../../../shared/orderRules.js';
+import { POINTS_PER_DOLLAR, POINTS_PER_REWARD, REWARD_CENTS, normalizeEmail } from '../../../shared/orderRules.js';
 
 /**
- * Phone-number rewards in the kiosk cart. Any valid number earns points on the order; looking it up
+ * Email rewards in the kiosk cart. Any valid email earns points and gets the receipt; looking it up
  * shows the balance and lets the customer spend whole $1 rewards. `points` is null until looked up.
  */
-export default function RewardsBox({ phone, onPhoneChange, points, onPoints, redeem, maxRedeem, onRedeem }) {
+export default function RewardsBox({ email, onEmailChange, points, onPoints, redeem, maxRedeem, onRedeem }) {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
-  const valid = normalizePhone(phone) !== null;
-  const partial = phone.length > 0 && !valid;
+  const valid = normalizeEmail(email) !== null;
+  const partial = email.trim().length > 0 && !valid;
 
   const check = async () => {
     if (!valid || checking) return;
     setChecking(true);
     setError('');
     try {
-      onPoints((await Api.rewards(normalizePhone(phone))).points);
+      onPoints((await Api.rewards(normalizeEmail(email))).points);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -29,22 +29,21 @@ export default function RewardsBox({ phone, onPhoneChange, points, onPoints, red
 
   return (
     <div className="kiosk-rewards">
-      <label className="kiosk-cart-label" htmlFor="kiosk-rewards-phone">
-        Rewards: {POINTS_PER_DOLLAR} points per $1, {POINTS_PER_REWARD.toLocaleString()} points = {money(REWARD_CENTS)} off
+      <label className="kiosk-cart-label" htmlFor="kiosk-rewards-email">
+        Email for rewards and receipt: {POINTS_PER_DOLLAR} points per $1, {POINTS_PER_REWARD.toLocaleString()} points = {money(REWARD_CENTS)} off
       </label>
       <div className="kiosk-rewards-row">
         <input
-          id="kiosk-rewards-phone"
+          id="kiosk-rewards-email"
           className="field"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="Phone number"
-          maxLength={10}
-          value={phone}
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
           aria-invalid={error || partial ? 'true' : undefined}
           aria-describedby={error ? 'kiosk-rewards-error' : partial ? 'kiosk-rewards-partial' : undefined}
-          onChange={(e) => onPhoneChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
+          onChange={(e) => onEmailChange(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && check()}
         />
         <button type="button" className="btn btn-secondary" onClick={check} disabled={!valid || checking}>
@@ -54,7 +53,7 @@ export default function RewardsBox({ phone, onPhoneChange, points, onPoints, red
       {error && <p id="kiosk-rewards-error" role="alert" className="kiosk-rewards-error">{error}</p>}
       {partial && !error && (
         <p id="kiosk-rewards-partial" className="kiosk-rewards-error">
-          Enter all 10 digits, or clear it to order without rewards.
+          Finish your email address, or clear it to order without rewards.
         </p>
       )}
       {points !== null && (
