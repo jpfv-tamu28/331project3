@@ -38,9 +38,11 @@ export const pointsForPayment = (paidCents) => Math.floor((paidCents * POINTS_PE
 export const maxRewards = (points, totalCents) => Math.max(0,
   Math.min(Math.floor(points / POINTS_PER_REWARD), Math.floor(totalCents / REWARD_CENTS)));
 
-/** US phone number -> its 10 digits, or null. Accepts any punctuation and a leading 1. */
-export function normalizePhone(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-  return local.length === 10 ? local : null;
+// Deliberately loose: Resend does the real validation, this just rejects obvious typos early.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Rewards email -> trimmed and lowercased (so Me@x.com and me@x.com share points), or null. */
+export function normalizeEmail(raw) {
+  const email = String(raw ?? '').trim().toLowerCase();
+  return email.length <= 254 && EMAIL_PATTERN.test(email) ? email : null;
 }

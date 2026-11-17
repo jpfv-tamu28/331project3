@@ -1,17 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { maxRewards, normalizePhone, pointsForPayment } from '../../shared/orderRules.js';
+import { maxRewards, normalizeEmail, pointsForPayment } from '../../shared/orderRules.js';
 
-describe('normalizePhone', () => {
-  it('keeps the 10 digits of a US number however it is typed', () => {
-    for (const raw of ['9795550123', '(979) 555-0123', '979.555.0123', '+1 979 555 0123', '19795550123']) {
-      assert.equal(normalizePhone(raw), '9795550123', raw);
-    }
+describe('normalizeEmail', () => {
+  it('trims and lowercases so the same person always gets the same account', () => {
+    assert.equal(normalizeEmail('  Reveille@TAMU.edu '), 'reveille@tamu.edu');
+    assert.equal(normalizeEmail('a.b+boba@mail.example.com'), 'a.b+boba@mail.example.com');
   });
 
-  it('rejects anything that is not 10 digits', () => {
-    for (const raw of ['', '555-0123', '29795550123', '979555012345', null, undefined, 'phone']) {
-      assert.equal(normalizePhone(raw), null, String(raw));
+  it('rejects obvious typos', () => {
+    for (const bad of ['', 'tamu.edu', 'a@b', 'a b@tamu.edu', '@tamu.edu', null, undefined, 42, `${'a'.repeat(250)}@x.co`]) {
+      assert.equal(normalizeEmail(bad), null, String(bad));
     }
   });
 });

@@ -381,6 +381,7 @@ describe('orders HTTP routes', () => {
           recordedInserts.push({ table: 'reward_accounts', params });
           return { rows: [{ points: rewardPoints - params[1] + params[2] }] };
         }
+        if (sql.includes('FROM order_items WHERE order_id')) return { rows: [] };
         if (sql.startsWith('LOCK TABLE')) {
           return { rows: [] };
         }
@@ -475,7 +476,9 @@ describe('orders HTTP routes', () => {
       totalCents: 2136,
       paymentMethod: 'cash',
       pointsEarned: 0,
+      pointsRedeemed: 0,
       pointsBalance: null,
+      receiptSent: false,
     });
 
     assert.deepEqual(recordedInserts, [
@@ -519,11 +522,11 @@ describe('orders HTTP routes', () => {
     body: JSON.stringify({ items: [validLine()], ...extra }),
   });
 
-  it('earns 10 points per dollar paid when a phone number is given', async () => {
+  it('earns 10 points per dollar paid when an email is given', async () => {
     recordedInserts = [];
     rewardPoints = 0;
     // 525 + tax 43 = 568 paid -> 56 points
-    const res = await orderWithRewards({ rewardPhone: '(979) 555-0123' });
+    const res = await orderWithRewards({ rewardEmail: ' Guest@TAMU.edu ' });
     assert.equal(res.status, 201);
     const body = await res.json();
     assert.equal(body.pointsEarned, 56);
@@ -535,7 +538,7 @@ describe('orders HTTP routes', () => {
   it('takes $1 off per 1,000 points redeemed and earns on what is still paid', async () => {
     recordedInserts = [];
     rewardPoints = 2500;
-    const res = await orderWithRewards({ rewardPhone: '9795550123', redeemRewards: 2 });
+    const res = await orderWithRewards({ rewardEmail: 'guest@tamu.edu', redeemRewards: 2 });
     assert.equal(res.status, 201);
     const body = await res.json();
     // 568 - 200 = 368 paid -> 36 points; 2500 - 2000 + 36 = 536
@@ -549,11 +552,11 @@ describe('orders HTTP routes', () => {
   it('rejects redemptions the customer cannot afford or that exceed the total', async () => {
     recordedInserts = [];
     const cases = [
-      [{ rewardPoints: 500, body: { rewardPhone: '9795550123', redeemRewards: 1 } }, /Not enough points/],
-      [{ rewardPoints: 10000, body: { rewardPhone: '9795550123', redeemRewards: 6 } }, /more than the order total/],
-      [{ rewardPoints: 5000, body: { redeemRewards: 1 } }, /phone number to redeem/],
-      [{ rewardPoints: 0, body: { rewardPhone: '555-0123' } }, /10-digit phone number/],
-      [{ rewardPoints: 5000, body: { rewardPhone: '9795550123', redeemRewards: 1.5 } }, /whole number/],
+      [{ rewardPoints: 500, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 1 } }, /Not enough points/],
+      [{ rewardPoints: 10000, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 6 } }, /more than the order total/],
+      [{ rewardPoints: 5000, body: { redeemRewards: 1 } }, /email to redeem/],
+      [{ rewardPoints: 0, body: { rewardEmail: 'not-an-email' } }, /valid email/],
+      [{ rewardPoints: 5000, body: { rewardEmail: 'guest@tamu.edu', redeemRewards: 1.5 } }, /whole number/],
     ];
     for (const [{ rewardPoints: points, body }, message] of cases) {
       rewardPoints = points;

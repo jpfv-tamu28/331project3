@@ -1,10 +1,10 @@
--- Adds phone-number rewards to an existing database without touching its data.
+-- Adds email rewards to an existing database without touching its data.
 -- Safe to run more than once. Run from psql:  \i database/migrations/002_rewards.sql
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS reward_accounts (
     reward_account_id SERIAL PRIMARY KEY,
-    phone CHAR(10) NOT NULL UNIQUE,                   -- digits only
+    email VARCHAR(254) NOT NULL UNIQUE,               -- stored lowercased
     points INT NOT NULL DEFAULT 0 CHECK (points >= 0),
     created_at TIMESTAMP NOT NULL DEFAULT LOCALTIMESTAMP
 );
