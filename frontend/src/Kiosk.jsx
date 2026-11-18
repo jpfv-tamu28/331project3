@@ -12,6 +12,7 @@ import CartPanel from './kiosk/CartPanel';
 import DrinkArt from './kiosk/DrinkArt';
 import OrderBuddy from './kiosk/OrderBuddy';
 import { flavorColor } from './kiosk/drinkColors';
+import Magnifier from './kiosk/Magnifier';
 import SettingsDialog from './kiosk/SettingsDialog';
 import WeatherIcon from './kiosk/WeatherIcon';
 import { useKioskSettings } from './kiosk/useKioskSettings';
@@ -34,7 +35,7 @@ const PAYMENT_NOTES = {
 /**
  * Self-order kiosk: menu sections laid side by side and scrolled left to right, two rows of
  * large square tiles per section, section tabs across the top, a cart panel toggled from the top left,
- * and a settings gear (theme, text size, weather) at the top right.
+ * and a settings gear (theme, text size, magnifier, weather) at the top right.
  * Reuses the cashier's customize dialog and pricing so both screens charge the same way.
  */
 export default function Kiosk() {
@@ -55,6 +56,7 @@ export default function Kiosk() {
   const [settings, updateSettings] = useKioskSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const trackRef = useRef(null);
+  const kioskRef = useRef(null);
   const tabRefs = useRef({});
   const [intro, setIntro] = useState(true);
   const introPlayed = useRef(false);
@@ -241,7 +243,7 @@ export default function Kiosk() {
   
 
   return (
-    <main className={`kiosk${intro ? ' kiosk-intro' : ''}`}>
+    <main ref={kioskRef} className={`kiosk${intro ? ' kiosk-intro' : ''}`}>
       <header className="kiosk-header">
         <button
           type="button"
@@ -391,6 +393,8 @@ export default function Kiosk() {
       {settingsOpen && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
+
+      {settings.magnifier !== 'off' && <Magnifier sourceRef={kioskRef} zoom={Number(settings.magnifier)} />}
 
       {placed && (
         <Modal title="Thank you!" submitLabel="Start a new order" onClose={startOver} className="kiosk-modal kiosk-done">

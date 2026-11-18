@@ -938,3 +938,81 @@
   padding: 6px 12px;
   font-size: calc(13px * var(--kiosk-text, 1));
 }
+
+/* ---------- Magnifier (Settings → Magnifier) ---------- */
+.kiosk-settings-hint {
+  margin: 8px 0 0;
+  font-size: calc(13px * var(--kiosk-text, 1));
+  color: var(--subtle);
+}
+
+/* Fixed to the bottom-left corner; a popover so it stays above open dialogs. */
+.magnifier,
+.magnifier:popover-open {
+  position: fixed;
+  inset: auto auto 16px 16px;
+  width: clamp(240px, 36vw, 520px);
+  height: clamp(180px, 36vh, 380px);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 3px solid var(--accent);
+  border-radius: 18px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.45);
+  pointer-events: none; /* taps and clicks go straight through to the kiosk */
+  z-index: 2147483647;
+}
+
+.magnifier-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  /* Makes the copy's position: fixed children (modal copies) relative to the stage, not the screen. */
+  contain: layout paint;
+}
+
+/* The copy is a still snapshot: show each element's settled state and keep restored scroll positions exact. */
+.magnifier-stage *,
+.magnifier-stage *::before,
+.magnifier-stage *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+  scroll-snap-type: none !important;
+}
+
+.magnifier-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+/* Marks the pointer's spot inside the lens. */
+.magnifier-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.7);
+}
+
+.magnifier-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 800;
+}

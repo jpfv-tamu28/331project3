@@ -12,8 +12,14 @@ export const TEXT_SIZES = [
   { value: 'xlarge', label: 'Extra large', scale: 1.4 },
 ];
 
+export const MAGNIFIER = [
+  { value: 'off', label: 'Off' },
+  { value: '2', label: '2×' },
+  { value: '3', label: '3×' },
+];
+
 const STORAGE_KEY = 'kiosk-settings';
-const DEFAULTS = { theme: 'light', textSize: 'default' };
+const DEFAULTS = { theme: 'light', textSize: 'default', magnifier: 'off' };
 
 function load() {
   try {
@@ -21,6 +27,7 @@ function load() {
     return {
       theme: THEMES.some((t) => t.value === saved?.theme) ? saved.theme : DEFAULTS.theme,
       textSize: TEXT_SIZES.some((s) => s.value === saved?.textSize) ? saved.textSize : DEFAULTS.textSize,
+      magnifier: MAGNIFIER.some((m) => m.value === saved?.magnifier) ? saved.magnifier : DEFAULTS.magnifier,
     };
   } catch {
     return DEFAULTS;
