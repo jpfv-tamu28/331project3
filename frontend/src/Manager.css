@@ -135,17 +135,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- List tabs (menu, inventory, employees) ---------- */
+.table-count {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.data-table tbody tr.row-muted td {
+  color: var(--muted);
+}
+
 /* ---------- Inventory ---------- */
 .inventory-tab {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.inventory-tab > .dense-list {
-  flex: 1;
-  height: auto;
 }
 
 .inventory-summary {

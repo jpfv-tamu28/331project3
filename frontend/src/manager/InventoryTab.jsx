@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Api, errorMessage } from '../api';
-import { DenseList } from '../components/DenseList';
 import { Modal } from '../components/Modal';
 import { Segmented } from '../components/Segmented';
 import { StatTiles } from '../components/StatTiles';
 import { StateMessage } from '../components/StateMessage';
+import { StatusBadge, TableView } from '../components/TableView';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
 import { isoDate, quantity } from '../format';
 import {
-  COVER_DAYS, SOON_DAYS, STATUS, URGENT_GROUPS, USAGE_WINDOW_DAYS,
-  describeSupply, inventoryCsv, needsAttention, stockStatus, suggestedRestock,
+  COVER_DAYS, SOON_DAYS, STATUS, USAGE_WINDOW_DAYS,
+  daysOfStock, describeSupply, inventoryCsv, needsAttention, stockStatus, suggestedRestock,
 } from './inventoryStatus';
 
 const UNITS = ['g', 'ml', 'each'];
@@ -21,17 +21,38 @@ const FILTERS = [
   { label: 'Not in any recipe', test: (i) => i.usedIn === 0 },
 ];
 
-const usageText = (i) => (i.dailyUse > 0 ? `~${quantity(i.dailyUse)} ${i.unit}/day` : null);
+// Most urgent first; also what the Status column sorts by.
+const URGENCY = { out: 0, low: 1, soon: 2, ok: 3 };
+const withUnit = (n, i) => `${quantity(n)} ${i.unit}`;
 
-const describe = (i) => ({
-  title: i.name,
-  subtitle: [usageText(i), describeSupply(i), `Updated ${i.updatedAt}`].filter(Boolean).join(' · '),
-  value: `${quantity(i.onHand)} ${i.unit}`,
-  detail: `reorder at ${quantity(i.reorderLevel)}`,
-  badge: STATUS[stockStatus(i)].badge,
-});
+const COLUMNS = [
+  { key: 'name', label: 'Ingredient' },
+  { key: 'onHand', label: 'On Hand', type: 'number', render: (i) => withUnit(i.onHand, i) },
+  { key: 'reorderLevel', label: 'Reorder Level', type: 'number', render: (i) => withUnit(i.reorderLevel, i) },
+  { key: 'dailyUse', label: 'Avg Use / Day', type: 'number', render: (i) => (i.dailyUse > 0 ? withUnit(Math.max(0.1, Math.round(i.dailyUse * 10) / 10), i) : '-') },
+  {
+    key: 'daysLeft',
+    label: 'Days of Stock',
+    type: 'number',
+    render: (i) => {
+      const days = daysOfStock(i);
+      if (days === null) return '-';
+      return days >= 365 ? '365+' : quantity(Math.floor(days));
+    },
+  },
+  {
+    key: 'urgency',
+    label: 'Status',
+    render: (i) => {
+      const { badge, group } = STATUS[stockStatus(i)];
+      return badge ? <StatusBadge text={badge.text} alert={badge.alert} /> : group;
+    },
+  },
+  { key: 'usedIn', label: 'Used In', type: 'number', render: (i) => `${i.usedIn} item${i.usedIn === 1 ? '' : 's'}` },
+  { key: 'updatedAt', label: 'Updated' },
+];
 
-const groupOf = (i) => STATUS[stockStatus(i)].group;
+const searchText = (i) => `${i.name} ${i.unit} ${STATUS[stockStatus(i)].group}`;
 
 function downloadCsv(items) {
   const blob = new Blob([inventoryCsv(items)], { type: 'text/csv;charset=utf-8' });
@@ -56,6 +77,12 @@ export default function InventoryTab({ refreshKey }) {
     return c;
   }, [inventory.data]);
 
+  // Urgent ingredients first, then by name, until a column header is clicked.
+  // Unused ingredients sort last by days of stock (they never run out from sales).
+  const rows = useMemo(() => (inventory.data ?? [])
+    .map((i) => ({ ...i, urgency: URGENCY[stockStatus(i)], daysLeft: daysOfStock(i) ?? Number.MAX_VALUE }))
+    .sort((a, b) => (a.urgency - b.urgency) || a.name.localeCompare(b.name)), [inventory.data]);
+
   if (!inventory.data) {
     return <StateMessage loading={inventory.loading} error={inventory.error} onRetry={inventory.reload} />;
   }
@@ -79,14 +106,15 @@ export default function InventoryTab({ refreshKey }) {
           Usage is averaged over the last {USAGE_WINDOW_DAYS} days of sales.
         </p>
       </div>
-      <DenseList
-        items={items}
+      <TableView
+        rows={rows}
+        columns={COLUMNS}
+        rowKey={(i) => i.id}
+        caption="Inventory"
         searchLabel="Search ingredients"
+        searchText={searchText}
         filters={FILTERS}
-        groupOf={groupOf}
-        pinnedGroups={URGENT_GROUPS}
-        describe={describe}
-        onOpen={setEditing}
+        onSelect={setEditing}
         noun="ingredient"
         actions={(
           <>
@@ -298,10 +326,9 @@ function RestockDialog({ items, onClose, onSaved }) {
   const [amounts, setAmounts] = useState({}); // id -> text typed
   const [busy, setBusy] = useState(false);
 
-  const urgency = { out: 0, low: 1, soon: 2, ok: 3 };
   const rows = items
     .filter((i) => scope === 'all' || needsAttention(i))
-    .sort((a, b) => (urgency[stockStatus(a)] - urgency[stockStatus(b)]) || a.name.localeCompare(b.name));
+    .sort((a, b) => (URGENCY[stockStatus(a)] - URGENCY[stockStatus(b)]) || a.name.localeCompare(b.name));
   const suggestions = rows.filter((i) => suggestedRestock(i) > 0);
 
   const fillSuggested = () => {

@@ -1,4 +1,4 @@
-/** Row of single-select filter buttons (DenseList.ChipBar). value may be null for "none highlighted". */
+/** Row of single-select filter buttons (ported from DenseList.ChipBar). value may be null for "none highlighted". */
 export function ChipBar({ options, value, onChange, label }) {
   return (
     <div className="chip-bar" role="group" aria-label={label}>

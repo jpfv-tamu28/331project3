@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Api, errorMessage } from '../api';
-import { DenseList } from '../components/DenseList';
 import { Modal } from '../components/Modal';
 import { StateMessage } from '../components/StateMessage';
+import { StatusBadge, TableView } from '../components/TableView';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
-import { capitalize, money, parsePriceCents } from '../format';
+import { capitalize, parsePriceCents } from '../format';
 import { ITEM_TYPES } from '../../../shared/orderRules.js';
 import SeasonalItemDialog from './SeasonalItemDialog';
 
@@ -18,17 +18,30 @@ const FILTERS = [
   { label: 'Unavailable', test: (m) => !m.isAvailable },
 ];
 
-const describe = (m) => ({
-  title: m.name,
-  subtitle: `${capitalize(m.itemType)} · #${m.id}`,
-  value: money(m.priceCents),
-  badge: m.isAvailable ? null : { text: 'Unavailable' },
-});
+const COLUMNS = [
+  { key: 'id', label: 'ID', type: 'id' },
+  { key: 'name', label: 'Name' },
+  { key: 'category', label: 'Category' },
+  { key: 'itemType', label: 'Type', render: (m) => capitalize(m.itemType) },
+  { key: 'priceCents', label: 'Price', type: 'cents' },
+  {
+    key: 'status',
+    label: 'Status',
+    render: (m) => (m.isAvailable ? 'Available' : <StatusBadge text="Unavailable" />),
+  },
+];
+
+const searchText = (m) => `${m.name} ${m.category} ${m.itemType} #${m.id}`;
 
 export default function MenuTab({ refreshKey }) {
   const menu = useResource(() => Api.menu(), [refreshKey]);
   const [editing, setEditing] = useState(null); // item, or {} for a new one
   const [seasonal, setSeasonal] = useState(false);
+
+  // Grouped by category, then by name, until a column header is clicked.
+  const rows = useMemo(() => (menu.data ?? [])
+    .map((m) => ({ ...m, status: m.isAvailable ? 'Available' : 'Unavailable' }))
+    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)), [menu.data]);
 
   if (!menu.data) {
     return <StateMessage loading={menu.loading} error={menu.error} onRetry={menu.reload} />;
@@ -38,13 +51,16 @@ export default function MenuTab({ refreshKey }) {
 
   return (
     <>
-      <DenseList
-        items={menu.data}
+      <TableView
+        rows={rows}
+        columns={COLUMNS}
+        rowKey={(m) => m.id}
+        caption="Menu items"
         searchLabel="Search menu"
+        searchText={searchText}
         filters={FILTERS}
-        groupOf={(m) => m.category}
-        describe={describe}
-        onOpen={setEditing}
+        onSelect={setEditing}
+        rowClassName={(m) => (m.isAvailable ? '' : 'row-muted')}
         noun="item"
         actions={(
           <>
