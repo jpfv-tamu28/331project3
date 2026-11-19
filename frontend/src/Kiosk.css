@@ -128,6 +128,44 @@
   min-width: 0;
 }
 
+.kiosk-motion-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: calc(14px * var(--kiosk-text, 1));
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.kiosk-motion-btn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.kiosk-motion-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.kiosk-motion-btn.paused {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.kiosk-motion-btn.paused:hover {
+  filter: brightness(1.08);
+}
+
 .kiosk-settings-btn {
   flex: none;
   display: grid;
@@ -737,11 +775,28 @@
   }
 }
 
+.kiosk:not(.kiosk-intro) .kiosk-liquid-fill {
+  animation: none;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kiosk-liquid-fill {
     animation: none;
     transform: none;
   }
+}
+
+:root[data-kiosk-motion='paused'] *,
+:root[data-kiosk-motion='paused'] *::before,
+:root[data-kiosk-motion='paused'] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+:root[data-kiosk-motion='paused'] .kiosk-liquid-fill {
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Once settled, every tile drifts a little, like objects suspended in liquid. */

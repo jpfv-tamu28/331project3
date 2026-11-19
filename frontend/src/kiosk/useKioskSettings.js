@@ -12,8 +12,13 @@ export const TEXT_SIZES = [
   { value: 'xlarge', label: 'Extra large', scale: 1.4 },
 ];
 
+export const ANIMATIONS = [
+  { value: 'on', label: 'On' },
+  { value: 'paused', label: 'Paused' },
+];
+
 const STORAGE_KEY = 'kiosk-settings';
-const DEFAULTS = { theme: 'light', textSize: 'default' };
+const DEFAULTS = { theme: 'light', textSize: 'default', animationsPaused: false };
 
 function load() {
   try {
@@ -21,6 +26,7 @@ function load() {
     return {
       theme: THEMES.some((t) => t.value === saved?.theme) ? saved.theme : DEFAULTS.theme,
       textSize: TEXT_SIZES.some((s) => s.value === saved?.textSize) ? saved.textSize : DEFAULTS.textSize,
+      animationsPaused: typeof saved?.animationsPaused === 'boolean' ? saved.animationsPaused : DEFAULTS.animationsPaused,
     };
   } catch {
     return DEFAULTS;
@@ -34,6 +40,11 @@ export function useKioskSettings() {
     const root = document.documentElement;
     root.dataset.kioskTheme = settings.theme;
     root.style.setProperty('--kiosk-text', TEXT_SIZES.find((s) => s.value === settings.textSize).scale);
+    if (settings.animationsPaused) {
+      root.dataset.kioskMotion = 'paused';
+    } else {
+      delete root.dataset.kioskMotion;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     } catch {
@@ -43,6 +54,7 @@ export function useKioskSettings() {
 
   useEffect(() => () => {
     delete document.documentElement.dataset.kioskTheme;
+    delete document.documentElement.dataset.kioskMotion;
     document.documentElement.style.removeProperty('--kiosk-text');
   }, []);
 

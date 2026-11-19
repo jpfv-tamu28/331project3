@@ -51,6 +51,7 @@ export default function Kiosk() {
   const tabRefs = useRef({});
   const [intro, setIntro] = useState(true);
   const introPlayed = useRef(false);
+  const introAnimsRef = useRef([]);
 
   const items = useMemo(() => menu.data ?? [], [menu.data]);
   const toppings = useMemo(() => items.filter(isTopping), [items]);
@@ -72,7 +73,7 @@ export default function Kiosk() {
     introPlayed.current = true;
 
     const track = trackRef.current;
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches || settings.animationsPaused;
     if (!track || reduceMotion || !track.animate) {
       setIntro(false);
       return;
@@ -115,11 +116,22 @@ export default function Kiosk() {
       }
     }
 
+    introAnimsRef.current = anims;
     Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(() => {
       anims.forEach((a) => a.cancel());
+      if (introAnimsRef.current === anims) introAnimsRef.current = [];
       setIntro(false);
     });
-  }, [menu.data, sections]);
+  }, [menu.data, sections, settings.animationsPaused]);
+
+  const handleSettingsChange = (patch) => {
+    if (patch.animationsPaused && introAnimsRef.current.length > 0) {
+      introAnimsRef.current.forEach((a) => a.cancel());
+      introAnimsRef.current = [];
+      setIntro(false);
+    }
+    updateSettings(patch);
+  };
 
   const totals = orderTotals(lines);
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);
@@ -241,6 +253,24 @@ export default function Kiosk() {
         </button>
         <h1 className="kiosk-brand">Boba Bops</h1>
         <div className="kiosk-header-actions">
+          <button
+            type="button"
+            className={`kiosk-motion-btn${settings.animationsPaused ? ' paused' : ''}`}
+            aria-label={settings.animationsPaused ? 'Play animations' : 'Pause animations'}
+            onClick={() => handleSettingsChange({ animationsPaused: !settings.animationsPaused })}
+          >
+            {settings.animationsPaused ? (
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 5v14l11-7Z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+              </svg>
+            )}
+            <span>{settings.animationsPaused ? 'Play' : 'Pause'}</span>
+          </button>
           <TranslateButton />
           <button
             type="button"
@@ -346,7 +376,7 @@ export default function Kiosk() {
       )}
 
       {settingsOpen && (
-        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
+        <SettingsDialog settings={settings} onChange={handleSettingsChange} onClose={() => setSettingsOpen(false)} />
       )}
 
       {placed && (
