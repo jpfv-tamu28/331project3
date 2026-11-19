@@ -2,7 +2,7 @@ import { Api } from '../api';
 import { Modal } from '../components/Modal';
 import { Segmented } from '../components/Segmented';
 import { useResource } from '../components/useResource';
-import { MAGNIFIER, THEMES, TEXT_SIZES } from './useKioskSettings';
+import { ANIMATIONS, MAGNIFIER, THEMES, TEXT_SIZES } from './useKioskSettings';
 import WeatherIcon from './WeatherIcon';
 
 export default function SettingsDialog({ settings, onChange, onClose }) {
@@ -34,6 +34,16 @@ export default function SettingsDialog({ settings, onChange, onClose }) {
             options={MAGNIFIER}
             value={settings.magnifier}
             onChange={(magnifier) => onChange({ magnifier })}
+          />
+        </fieldset>
+
+        <fieldset>
+          <legend>Animations</legend>
+          <Segmented
+            label="Animations"
+            options={ANIMATIONS}
+            value={settings.animationsPaused ? 'paused' : 'on'}
+            onChange={(value) => onChange({ animationsPaused: value === 'paused' })}
           />
         </fieldset>
 
