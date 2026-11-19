@@ -177,6 +177,12 @@ button:disabled {
   color: var(--text);
 }
 
+.btn-sm {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
 .btn-lg {
   min-height: 48px;
   font-size: 15px;
@@ -553,24 +559,40 @@ select.field {
   list-style: none;
 }
 
+.dense-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--row-line);
+  background: var(--surface);
+}
+
+.dense-item:hover {
+  background: var(--row-hover);
+}
+
 .dense-row {
   display: flex;
   align-items: center;
   gap: 16px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 10px 20px;
   border: 0;
-  border-bottom: 1px solid var(--row-line);
-  background: var(--surface);
+  background: transparent;
   text-align: left;
-}
-
-.dense-row:hover {
-  background: var(--row-hover);
 }
 
 .dense-row:active {
   background: var(--row-pressed);
+}
+
+.dense-row-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 0 0;
+  margin-left: -8px;
+  flex-shrink: 0;
 }
 
 .dense-row-text {

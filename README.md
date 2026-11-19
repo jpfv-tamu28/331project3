@@ -71,6 +71,7 @@ All routes are under `/api`. Errors come back as `{ "error": "message" }`.
 | POST / PUT | `/menu`, `/menu/:id` | `{ name, category, itemType, priceCents, isAvailable }` (requires OAuth) |
 | POST | `/menu/seasonal` | adds a Seasonal item and its recipe in one transaction (requires OAuth) |
 | GET / POST / PUT | `/inventory`, `/inventory/:id` | `{ name, unit, onHand, reorderLevel }` (requires OAuth) |
+| POST | `/inventory/reorder-low`, `/inventory/:id/reorder` | Restocks low-stock items (or one item) to 3× `reorderLevel` (requires OAuth) |
 | GET / POST / PUT | `/employees`, `/employees/:id` | `{ name, role, pin, isActive }`; PINs are never returned (requires OAuth) |
 | GET | `/orders?limit=100` | most recent first (requires OAuth) |
 | GET | `/orders/:id/items` | lines of one order; add-ons carry `parentId` (requires OAuth) |

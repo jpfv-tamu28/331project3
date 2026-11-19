@@ -38,6 +38,8 @@ export const Api = {
   inventory: () => api.get('/inventory').then((r) => r.data),
   saveIngredient: (id, item) =>
     (id ? api.put(`/inventory/${id}`, item) : api.post('/inventory', item)).then((r) => r.data),
+  reorderIngredient: (id) => api.post(`/inventory/${id}/reorder`).then((r) => r.data),
+  reorderLowInventory: () => api.post('/inventory/reorder-low').then((r) => r.data),
 
   employees: () => api.get('/employees').then((r) => r.data),
   saveEmployee: (id, emp) =>

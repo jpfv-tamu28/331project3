@@ -6,8 +6,9 @@ import { SectionBar } from './SectionBar';
  * Searchable list of rows grouped under section headers.
  * filters: [{ label, test(item) }], the first is selected initially.
  * describe(item) -> { title, subtitle, value, detail?, badge?: { text, alert? } }
+ * rowActions(item) -> optional ReactNode rendered alongside the row button
  */
-export function DenseList({ items, searchLabel, filters, groupOf, pinnedGroups = [], describe, onOpen, noun, actions }) {
+export function DenseList({ items, searchLabel, filters, groupOf, pinnedGroups = [], describe, onOpen, noun, actions, rowActions }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState(filters[0].label);
 
@@ -50,24 +51,28 @@ export function DenseList({ items, searchLabel, filters, groupOf, pinnedGroups =
             <section key={group} aria-label={group}>
               <SectionBar title={group} note={`${list.length} ${noun}${list.length === 1 ? '' : 's'}`} />
               <ul>
-                {list.map(({ item, row }) => (
-                  <li key={item.id}>
-                    <button type="button" className="dense-row" onClick={() => onOpen(item)}>
-                      <span className="dense-row-text">
-                        <strong>{row.title}</strong>
-                        <span>{row.subtitle}</span>
-                      </span>
-                      {row.badge && (
-                        <span className={`badge${row.badge.alert ? ' badge-alert' : ''}`}>{row.badge.text}</span>
-                      )}
-                      <span className="dense-row-value">
-                        <strong>{row.value}</strong>
-                        {row.detail && <span>{row.detail}</span>}
-                      </span>
-                      <span className="edit-chip">Edit</span>
-                    </button>
-                  </li>
-                ))}
+                {list.map(({ item, row }) => {
+                  const extra = rowActions?.(item);
+                  return (
+                    <li key={item.id} className="dense-item">
+                      <button type="button" className="dense-row" onClick={() => onOpen(item)}>
+                        <span className="dense-row-text">
+                          <strong>{row.title}</strong>
+                          <span>{row.subtitle}</span>
+                        </span>
+                        {row.badge && (
+                          <span className={`badge${row.badge.alert ? ' badge-alert' : ''}`}>{row.badge.text}</span>
+                        )}
+                        <span className="dense-row-value">
+                          <strong>{row.value}</strong>
+                          {row.detail && <span>{row.detail}</span>}
+                        </span>
+                        <span className="edit-chip">Edit</span>
+                      </button>
+                      {extra && <div className="dense-row-action">{extra}</div>}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))

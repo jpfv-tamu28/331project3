@@ -6,43 +6,132 @@ import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
 import { quantity } from '../format';
+import { REORDER_MULTIPLIER, canReorder, isLowStock, reorderTarget } from '../../../shared/inventoryRules.js';
 
 const UNITS = ['g', 'ml', 'each'];
 const LOW = 'Below reorder level';
-const isLow = (i) => i.onHand <= i.reorderLevel;
 
 const FILTERS = [
   { label: 'All', test: () => true },
-  { label: 'Low stock', test: isLow },
+  { label: 'Low stock', test: isLowStock },
 ];
 
 const describe = (i) => ({
   title: i.name,
   subtitle: `Updated ${i.updatedAt} · #${i.id}`,
   value: `${quantity(i.onHand)} ${i.unit}`,
-  detail: `reorder at ${quantity(i.reorderLevel)}`,
-  badge: isLow(i) ? { text: 'Low stock', alert: true } : null,
+  detail: canReorder(i)
+    ? `reorder at ${quantity(i.reorderLevel)} · restocks to ${quantity(reorderTarget(i.reorderLevel))}`
+    : `reorder at ${quantity(i.reorderLevel)}`,
+  badge: isLowStock(i) ? { text: 'Low stock', alert: true } : null,
 });
 
 export default function InventoryTab({ refreshKey }) {
+  const toast = useToast();
   const inventory = useResource(() => Api.inventory(), [refreshKey]);
   const [editing, setEditing] = useState(null);
+  const [reorderingIds, setReorderingIds] = useState(() => new Set());
+  const [reorderingAll, setReorderingAll] = useState(false);
 
   if (!inventory.data) {
     return <StateMessage loading={inventory.loading} error={inventory.error} onRetry={inventory.reload} />;
   }
+
+  const lowReorderableCount = inventory.data.filter(canReorder).length;
+
+  const reorderOne = async (item) => {
+    if (reorderingAll || reorderingIds.has(item.id) || !canReorder(item)) return;
+    setReorderingIds((prev) => new Set(prev).add(item.id));
+    try {
+      const updated = await Api.reorderIngredient(item.id);
+      toast.success('Ingredient reordered', `${updated.name} set to ${quantity(updated.onHand)} ${updated.unit}.`);
+      inventory.reload();
+    } catch (err) {
+      toast.error('Error reordering ingredient', errorMessage(err));
+      if (err?.response?.status === 404 || err?.response?.status === 409) {
+        inventory.reload();
+      }
+    } finally {
+      setReorderingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const reorderAll = async () => {
+    if (reorderingAll || reorderingIds.size > 0 || lowReorderableCount === 0) return;
+    setReorderingAll(true);
+    try {
+      const result = await Api.reorderLowInventory();
+      if (result.count === 0) {
+        toast.info('Nothing to reorder', 'All ingredients with a reorder level are already in stock.');
+      } else if (result.count === 1) {
+        const item = result.items[0];
+        toast.success('Low stock reordered', `${item.name} set to ${quantity(item.onHand)} ${item.unit}.`);
+      } else {
+        toast.success('Low stock reordered', `Updated ${result.count} ingredients to ${REORDER_MULTIPLIER}× their reorder level.`);
+      }
+      inventory.reload();
+    } catch (err) {
+      toast.error('Error reordering inventory', errorMessage(err));
+    } finally {
+      setReorderingAll(false);
+    }
+  };
+
   return (
     <>
       <DenseList
         items={inventory.data}
         searchLabel="Search ingredients"
         filters={FILTERS}
-        groupOf={(i) => (isLow(i) ? LOW : 'In stock')}
+        groupOf={(i) => (isLowStock(i) ? LOW : 'In stock')}
         pinnedGroups={[LOW]}
         describe={describe}
         onOpen={setEditing}
         noun="ingredient"
-        actions={<button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Ingredient</button>}
+        actions={(
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={reorderingAll || reorderingIds.size > 0 || lowReorderableCount === 0}
+              onClick={reorderAll}
+              title={
+                lowReorderableCount > 0
+                  ? `Set ${lowReorderableCount} low-stock ${lowReorderableCount === 1 ? 'ingredient' : 'ingredients'} to ${REORDER_MULTIPLIER}× reorder level`
+                  : 'No low-stock ingredients with a reorder level above 0'
+              }
+            >
+              {reorderingAll
+                ? 'Reordering…'
+                : lowReorderableCount > 0
+                  ? `Reorder All Low Stock (${lowReorderableCount})`
+                  : 'Reorder All Low Stock'}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Ingredient</button>
+          </>
+        )}
+        rowActions={(item) => {
+          if (!isLowStock(item)) return null;
+          const busy = reorderingIds.has(item.id);
+          const allowed = canReorder(item);
+          const targetLabel = `${quantity(reorderTarget(item.reorderLevel))} ${item.unit}`;
+          return (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={reorderingAll || busy || !allowed}
+              onClick={() => reorderOne(item)}
+              title={allowed ? `Set on hand to ${targetLabel}` : 'Set a reorder level above 0 to reorder'}
+              aria-label={allowed ? `Reorder ${item.name} to ${targetLabel}` : `Reorder ${item.name} unavailable`}
+            >
+              {busy ? 'Reordering…' : 'Reorder'}
+            </button>
+          );
+        }}
       />
       {editing && (
         <IngredientDialog
