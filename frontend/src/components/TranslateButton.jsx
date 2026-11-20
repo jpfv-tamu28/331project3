@@ -1,19 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
+import { Api } from '../api';
 import globeIcon from '../assets/translate_icon.png';
+import bundledTranslations from '../../../shared/kioskTranslations.json';
 
-const API = import.meta.env.VITE_LT_URL ?? '/lt';
 const SOURCE = 'en';
 const ATTRS = ['aria-label', 'placeholder', 'title', 'alt'];
-const SKIP = 'script,style,noscript,code,pre,[translate="no"],[data-no-translate]';
+const SKIP = 'script,style,noscript,code,pre,.magnifier,[translate="no"],[data-no-translate]';
 const RTL = new Set(['ar', 'he', 'fa', 'ur']);
-const CHUNK = 40;
+const CHUNK = 25;
+const STORAGE_CACHE_KEY = 'kiosk-translations-v1';
+const MAX_DYNAMIC_CACHE = 500;
 
 const cache = new Map();          // "lang\0text" -> translation
+const bundledKeys = new Set();    // keys already shipped in bundledTranslations
+const dynamicCache = new Map();   // dynamically fetched translations persisted in localStorage
 const textRecs = new WeakMap();   // Text node -> { orig, applied }
 const attrRecs = new WeakMap();   // Element -> { [attr]: { orig, applied } }
 
 const hasLetters = (s) => /\p{L}/u.test(s);
 const key = (lang, text) => `${lang}\0${text}`;
+
+// Pre-seed the in-memory cache from the static bundle so switching languages is instant.
+for (const [lang, entries] of Object.entries(bundledTranslations)) {
+  for (const [text, translated] of Object.entries(entries)) {
+    const k = key(lang, text);
+    cache.set(k, translated);
+    bundledKeys.add(k);
+  }
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_CACHE_KEY) || 'null');
+  if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+    for (const [k, v] of Object.entries(saved)) {
+      if (typeof v === 'string' && !bundledKeys.has(k)) {
+        cache.set(k, v);
+        dynamicCache.set(k, v);
+      }
+    }
+  }
+} catch {
+  /* ignore storage errors */
+}
+
+function saveDynamic(k, value) {
+  if (bundledKeys.has(k)) return;
+  if (dynamicCache.has(k)) dynamicCache.delete(k);
+  else if (dynamicCache.size >= MAX_DYNAMIC_CACHE) {
+    dynamicCache.delete(dynamicCache.keys().next().value);
+  }
+  dynamicCache.set(k, value);
+}
+
+function flushDynamicCache() {
+  try {
+    localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(Object.fromEntries(dynamicCache)));
+  } catch {
+    /* ignore storage quota/access errors */
+  }
+}
 
 function collect(root) {
   const targets = [];
@@ -52,17 +97,19 @@ function clearRec(t) {
 
 async function fetchTranslations(texts, lang, signal) {
   const todo = [...new Set(texts)].filter((t) => !cache.has(key(lang, t)));
+  if (todo.length === 0) return;
   for (let i = 0; i < todo.length; i += CHUNK) {
     const chunk = todo.slice(i, i + CHUNK);
-    const res = await fetch(`${API}/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: chunk, source: SOURCE, target: lang, format: 'text' }),
-      signal,
+    const { translatedText } = await Api.translate(chunk, lang, { signal });
+    if (!Array.isArray(translatedText) || translatedText.length !== chunk.length) {
+      throw new Error('Unexpected response from translation server');
+    }
+    chunk.forEach((text, j) => {
+      const k = key(lang, text);
+      cache.set(k, translatedText[j]);
+      saveDynamic(k, translatedText[j]);
     });
-    if (!res.ok) throw new Error(`Translation server returned ${res.status}`);
-    const { translatedText } = await res.json();
-    chunk.forEach((text, j) => cache.set(key(lang, text), translatedText[j]));
+    flushDynamicCache();
   }
 }
 
@@ -77,10 +124,13 @@ async function translatePage(lang, { force, signal, onWork }) {
     jobs.push({ t, orig, pre, core, post });
   }
   if (!jobs.length) return;
-  onWork();
 
-  await fetchTranslations(jobs.map((j) => j.core), lang, signal);
-  if (signal.aborted) return;
+  const missing = [...new Set(jobs.map((j) => j.core))].filter((c) => !cache.has(key(lang, c)));
+  if (missing.length > 0) {
+    onWork();
+    await fetchTranslations(missing, lang, signal);
+    if (signal.aborted) return;
+  }
 
   for (const { t, orig, pre, core, post } of jobs) {
     if (readNow(t) !== t.current) continue; // changed while waiting; next pass handles it
@@ -111,13 +161,21 @@ export default function TranslateButton() {
 
   // Load the languages the server can translate English into.
   useEffect(() => {
-    fetch(`${API}/languages`)
-      .then((r) => r.json())
+    let cancelled = false;
+    Api.translateLanguages()
       .then((list) => {
+        if (cancelled) return;
         const en = list.find((l) => l.code === SOURCE);
-        setLanguages(list.filter((l) => l.code !== SOURCE && en?.targets.includes(l.code)));
+        const supported = list.filter((l) => l.code !== SOURCE && en?.targets.includes(l.code));
+        setLanguages(supported);
+        setLang((current) => (current === SOURCE || supported.some((l) => l.code === current) ? current : SOURCE));
       })
-      .catch(() => setError('Translation server unreachable'));
+      .catch(() => {
+        if (!cancelled) setError('Translation server unreachable');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -127,7 +185,6 @@ export default function TranslateButton() {
 
     if (lang === SOURCE) {
       restorePage();
-      setBusy(false);
       return undefined;
     }
 
@@ -135,10 +192,11 @@ export default function TranslateButton() {
     let timer;
     const run = async (force) => {
       try {
-        setError('');
         await translatePage(lang, { force, signal: ctrl.signal, onWork: () => setBusy(true) });
+        if (!ctrl.signal.aborted) setError('');
       } catch (e) {
-        if (e.name !== 'AbortError') setError('Translation failed');
+        const canceled = e?.name === 'AbortError' || e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED';
+        if (!canceled) setError('Translation failed');
       } finally {
         if (!ctrl.signal.aborted) setBusy(false);
       }
@@ -146,9 +204,14 @@ export default function TranslateButton() {
 
     run(true);
 
+    const isIgnored = (node) => {
+      const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      return Boolean(widgetRef.current?.contains(node) || el?.closest('.magnifier'));
+    };
+
     // Pick up content that appears or changes later (cart lines, fetched menu items, etc.)
     const observer = new MutationObserver((muts) => {
-      if (muts.every((m) => widgetRef.current?.contains(m.target))) return;
+      if (muts.every((m) => isIgnored(m.target))) return;
       clearTimeout(timer);
       timer = setTimeout(() => run(false), 200);
     });
@@ -164,6 +227,7 @@ export default function TranslateButton() {
     };
   }, [lang]);
 
+  const isBusy = lang !== SOURCE && busy;
   return (
     <div ref={widgetRef} className="translate-widget" translate="no">
       <label>
@@ -171,9 +235,13 @@ export default function TranslateButton() {
         <span className="visually-hidden">Language</span>
         <select
           value={lang}
-          onChange={(e) => setLang(e.target.value)}
+          onChange={(e) => {
+            setError('');
+            setBusy(false);
+            setLang(e.target.value);
+          }}
           disabled={!languages.length && lang === SOURCE}
-          aria-busy={busy}
+          aria-busy={isBusy}
         >
           <option value={SOURCE}>English</option>
           {languages.map((l) => (
@@ -181,7 +249,7 @@ export default function TranslateButton() {
           ))}
         </select>
       </label>
-      {busy && <span role="status" className="translate-status">Translating…</span>}
+      {isBusy && <span role="status" className="translate-status">Translating…</span>}
       {error && <span role="alert" className="translate-error">{error}</span>}
     </div>
   );
