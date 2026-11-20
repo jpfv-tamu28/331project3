@@ -100,7 +100,7 @@ export default function CartPanel({
           onClick={onPlaceOrder}
           disabled={lines.length === 0 || placing || rewards.emailIncomplete}
         >
-          {placing ? 'Placing order…' : `Place Order · ${money(totals.total)}`}
+          {placing ? 'Placing order…' : <>Place Order · <span>{money(totals.total)}</span></>}
         </button>
       </footer>
     </aside>

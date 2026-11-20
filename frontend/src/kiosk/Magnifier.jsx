@@ -164,7 +164,7 @@ export default function Magnifier({ sourceRef, zoom }) {
   }, [sourceRef, zoom]);
 
   return createPortal(
-    <div ref={lensRef} className="magnifier" popover="manual" aria-hidden="true">
+    <div ref={lensRef} className="magnifier" popover="manual" aria-hidden="true" translate="no">
       <div ref={stageRef} className="magnifier-stage" />
       <div ref={ringRef} className="magnifier-ring" />
       <span className="magnifier-zoom">{zoom}×</span>

@@ -84,6 +84,8 @@ All routes are under `/api`. Errors come back as `{ "error": "message" }`.
 | GET | `/orders/discounts/:code` | validates a discount code |
 | POST | `/orders` | see below |
 | GET | `/rewards?email=` | `{ points }` for a rewards email (0 if it has no account yet) |
+| GET | `/translate/languages` | supported languages for the kiosk language picker |
+| POST | `/translate` | `{ q, source?, target }` translates kiosk UI text via MyMemory (or optional Google/LibreTranslate) |
 | GET | `/reports` | list of range reports (requires OAuth) |
 | GET | `/reports/:key?from=&to=` | `daily-sales`, `top-items`, `sales-by-hour`, `category-sales`, `employee-performance` (requires OAuth) |
 | GET | `/reports/x-report?date=` | hourly totals for one day (requires OAuth) |

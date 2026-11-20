@@ -66,7 +66,9 @@ export const Api = {
   weatherSuggestions: () => api.get('/weather/suggestions').then((r) => r.data),
   pokemon: (id) => api.get(`/pokemon/${id}`).then((r) => r.data),
   rewards: (email) => api.get('/rewards', { params: { email } }).then((r) => r.data),
-  
+  translateLanguages: () => api.get('/translate/languages').then((r) => r.data),
+  translate: (q, target, { signal } = {}) =>
+    api.post('/translate', { q, source: 'en', target }, { signal, timeout: 30000 }).then((r) => r.data),
 
   productUsage: (from, to) => api.get('/reports/product-usage', { params: { from, to } }).then((r) => r.data),
 };
