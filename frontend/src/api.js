@@ -18,6 +18,11 @@ export function errorMessage(err) {
   return 'Could not reach the server. Check your connection and try again.';
 }
 
+/** Absolute-or-relative URL of an API path, for things axios doesn't handle (e.g. EventSource). */
+export function apiUrl(path) {
+  return `${API_BASE.replace(/\/+$/, '')}${path}`;
+}
+
 /** Builds the full URL that starts the Google OAuth 2.0 redirect flow. */
 export function googleLoginUrl(returnTo = '/') {
   const base = API_BASE.replace(/\/+$/, '');
@@ -38,6 +43,10 @@ export const Api = {
   inventory: () => api.get('/inventory').then((r) => r.data),
   saveIngredient: (id, item) =>
     (id ? api.put(`/inventory/${id}`, item) : api.post('/inventory', item)).then((r) => r.data),
+  /** items: [{ id, amount }]; adds each amount to on hand and returns the updated ingredients. */
+  restockInventory: (items) => api.post('/inventory/restock', { items }).then((r) => r.data),
+  ingredientRecipes: (id) => api.get(`/inventory/${id}/recipes`).then((r) => r.data),
+  deleteIngredient: (id) => api.delete(`/inventory/${id}`).then((r) => r.data),
 
   employees: () => api.get('/employees').then((r) => r.data),
   saveEmployee: (id, emp) =>
@@ -48,8 +57,6 @@ export const Api = {
   discounts: () => api.get('/orders/discounts').then((r) => r.data),
   createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   checkDiscount: (code) => api.get(`/orders/discounts/${encodeURIComponent(code)}`).then((r) => r.data),
-  discounts: () => api.get('/orders/discounts').then((r) => r.data),
-  createDiscount: (discount) => api.post('/orders/discounts', discount).then((r) => r.data),
   createOrder: (order) => api.post('/orders', order).then((r) => r.data),
 
   reportList: () => api.get('/reports').then((r) => r.data),

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Api, errorMessage } from '../api';
-import { DenseList } from '../components/DenseList';
 import { Modal } from '../components/Modal';
 import { StateMessage } from '../components/StateMessage';
+import { StatusBadge, TableView } from '../components/TableView';
 import { useResource } from '../components/useResource';
 import { useToast } from '../components/ToastProvider';
 
@@ -16,30 +16,45 @@ const FILTERS = [
   { label: 'Inactive', test: (e) => !e.isActive },
 ];
 
-const describe = (e) => ({
-  title: e.name,
-  subtitle: `Employee #${e.id}${e.hasPin ? '' : ' · no PIN, cannot log in'}`,
-  value: e.role,
-  badge: e.isActive ? null : { text: 'Inactive' },
-});
+const COLUMNS = [
+  { key: 'id', label: 'ID', type: 'id' },
+  { key: 'name', label: 'Name' },
+  { key: 'role', label: 'Role' },
+  {
+    key: 'pinStatus',
+    label: 'PIN',
+    render: (e) => (e.hasPin ? 'Set' : <StatusBadge text="Not set, cannot log in" alert />),
+  },
+  { key: 'status', label: 'Status', render: (e) => (e.isActive ? 'Active' : <StatusBadge text="Inactive" />) },
+];
+
+const searchText = (e) => `${e.name} ${e.role} #${e.id}`;
+// Managers first, then by name, until a column header is clicked.
+const ROLE_ORDER = { Manager: 0, Cashier: 1 };
 
 export default function EmployeesTab({ refreshKey }) {
   const employees = useResource(() => Api.employees(), [refreshKey]);
   const [editing, setEditing] = useState(null);
+
+  const rows = useMemo(() => (employees.data ?? [])
+    .map((e) => ({ ...e, pinStatus: e.hasPin ? 'Set' : 'Not set', status: e.isActive ? 'Active' : 'Inactive' }))
+    .sort((a, b) => ((ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9)) || a.name.localeCompare(b.name)), [employees.data]);
 
   if (!employees.data) {
     return <StateMessage loading={employees.loading} error={employees.error} onRetry={employees.reload} />;
   }
   return (
     <>
-      <DenseList
-        items={employees.data}
+      <TableView
+        rows={rows}
+        columns={COLUMNS}
+        rowKey={(e) => e.id}
+        caption="Employees"
         searchLabel="Search employees"
+        searchText={searchText}
         filters={FILTERS}
-        groupOf={(e) => `${e.role}s`}
-        pinnedGroups={['Managers', 'Cashiers']}
-        describe={describe}
-        onOpen={setEditing}
+        onSelect={setEditing}
+        rowClassName={(e) => (e.isActive ? '' : 'row-muted')}
         noun="employee"
         actions={<button type="button" className="btn btn-primary" onClick={() => setEditing({})}>Add Employee</button>}
       />

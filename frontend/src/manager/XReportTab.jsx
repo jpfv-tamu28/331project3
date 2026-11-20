@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { DataTable } from '../components/DataTable';
 import { StatTiles } from '../components/StatTiles';
+import { useAutoRefresh } from '../components/useAutoRefresh';
 import { useToast } from '../components/ToastProvider';
 import { hourLabel, isoDate, longDate, money } from '../format';
 
@@ -14,27 +15,36 @@ const COLUMNS = [
 ];
 
 /** Hourly sales snapshot for one day, today by default. Read-only: running it doesn't reset anything. */
-export default function XReportTab({ refreshKey }) {
+export default function XReportTab({ refreshKey, active = true }) {
   const toast = useToast();
   const [date, setDate] = useState(isoDate());
   const [report, setReport] = useState(null);
   const [tick, setTick] = useState(0);
+  const quiet = useRef(false); // background refreshes don't toast every 30 s while the server is unreachable
 
   useEffect(() => {
     let cancelled = false;
+    const silent = quiet.current;
+    quiet.current = false;
     Api.xReport(date)
       .then((data) => {
         if (!cancelled) setReport({ ...data, generatedAt: new Date() });
       })
       .catch((err) => {
-        if (!cancelled) toast.error("Couldn't run the X-Report", errorMessage(err));
+        if (!cancelled && !silent) toast.error("Couldn't run the X-Report", errorMessage(err));
       });
     return () => {
       cancelled = true;
     };
   }, [date, tick, refreshKey, toast]);
 
-  const rerun = () => setTick((t) => t + 1);
+  const rerun = ({ background = false } = {}) => {
+    quiet.current = background;
+    setTick((t) => t + 1);
+  };
+  // Today's report keeps up with new cashier/kiosk orders without pressing Run.
+  const live = date === isoDate();
+  useAutoRefresh(() => rerun({ background: true }), active && live);
 
   const hours = (report?.hours ?? []).map((h) => ({ ...h, avgCents: h.orders ? h.revenueCents / h.orders : 0 }));
   // The tiles carry the day's totals, so the table only lists hours.
@@ -53,7 +63,7 @@ export default function XReportTab({ refreshKey }) {
           Today
         </button>
         <div className="spacer" />
-        <button type="button" className="btn btn-primary" onClick={rerun}>Run X-Report</button>
+        <button type="button" className="btn btn-primary" onClick={() => rerun()}>Run X-Report</button>
       </div>
       <div className="xreport-overview">
         <StatTiles tiles={[
@@ -66,6 +76,7 @@ export default function XReportTab({ refreshKey }) {
           {report && (orders === 0
             ? `No sales recorded for ${longDate(report.date)}. Generated ${generated}`
             : `X-Report for ${longDate(report.date)}. Generated ${generated}`)}
+          {report && live && ' · Updates automatically as orders come in'}
         </p>
       </div>
       <div className="panel-fill table-wrap">

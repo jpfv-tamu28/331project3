@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 
-/** Equal-width buttons where exactly one option is picked (DenseList.Segmented). */
+/** Equal-width buttons where exactly one option is picked (ported from DenseList.Segmented). */
 export function Segmented({ options, value, onChange, label }) {
   const refs = useRef([]);
   // Arrow keys move between options, like a native radio group.

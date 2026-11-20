@@ -7,7 +7,17 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (value) => (value === null ? null
 // TIMESTAMP (without time zone) is stored as shop-local wall time; keep it as text so it isn't shifted to UTC.
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => value);
 
-export const pool = new pg.Pool({
+// Timestamps are stored as shop-local wall time (TIMESTAMP without time zone), so every session must
+// use the shop's time zone: otherwise LOCALTIMESTAMP / CURRENT_DATE / NOW() follow the server's (UTC on
+// the TAMU server), new orders are stamped hours ahead, and evening orders land on the next day's reports.
+export const SHOP_TIMEZONE = process.env.SHOP_TIMEZONE || 'America/Chicago';
+if (!/^[A-Za-z0-9_+\-/]+$/.test(SHOP_TIMEZONE)) {
+  throw new Error(`SHOP_TIMEZONE "${SHOP_TIMEZONE}" is not a valid time zone name.`);
+}
+
+/** Settings for one connection; the pool and the order-notification listener (orderEvents.js) share them. */
+export const connectionConfig = {
+  options: `-c TimeZone=${SHOP_TIMEZONE}`,
   host: process.env.DB_HOST || 'csce-315-db.engr.tamu.edu',
   port: Number(process.env.DB_PORT || 5432),
   database: process.env.DB_NAME || 'squad_55_db',
@@ -16,9 +26,13 @@ export const pool = new pg.Pool({
   // The TAMU server only accepts encrypted connections from off-campus addresses (the Java
   // driver negotiated SSL on its own; node-pg doesn't). Set DB_SSL=false for a local database.
   ssl: process.env.DB_SSL === 'false' ? undefined : { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10_000,
+};
+
+export const pool = new pg.Pool({
+  ...connectionConfig,
   max: Number(process.env.DB_POOL_MAX || 10),
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
 });
 
 pool.on('error', (err) => {

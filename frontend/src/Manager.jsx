@@ -93,7 +93,7 @@ export default function Manager() {
           className="manager-panel"
           hidden={active !== key}
         >
-          <Component refreshKey={refreshKey} />
+          <Component refreshKey={refreshKey} active={active === key} />
         </div>
       ))}
     </main>

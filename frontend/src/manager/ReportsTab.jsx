@@ -1,40 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Api, errorMessage } from '../api';
 import { ChipBar } from '../components/ChipBar';
 import { DataTable } from '../components/DataTable';
 import { StateMessage } from '../components/StateMessage';
 import { useResource } from '../components/useResource';
+import { useAutoRefresh } from '../components/useAutoRefresh';
+import { isoDate } from '../format';
 import { useToast } from '../components/ToastProvider';
 import { DateRangeToolbar } from './DateRange';
 import { useDateRange } from './useDateRange';
 
 /** Pick a report and a date range, then run it (Reports.java). */
-export default function ReportsTab({ refreshKey }) {
+export default function ReportsTab({ refreshKey, active = true }) {
   const toast = useToast();
   const reports = useResource(() => Api.reportList(), []);
   const [chosen, setChosen] = useState(null);
   const [range, setRange] = useDateRange();
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
+  const latest = useRef(0); // only the newest request may update the table
 
   const list = reports.data ?? [];
   const current = chosen ?? list[0]?.key;
 
-  const run = async (key = current, { from, to } = range) => {
+  const run = async (key = current, { from, to } = range, { background = false } = {}) => {
     if (!key) return;
     if (to < from) {
       toast.warning('Check the dates', 'The To date must be on or after the From date.');
       return;
     }
-    setRunning(true);
+    const request = ++latest.current;
+    if (!background) setRunning(true);
     try {
-      setResult(await Api.report(key, from, to));
+      const data = await Api.report(key, from, to);
+      if (request === latest.current) setResult(data);
     } catch (err) {
-      toast.error("Couldn't run the report", errorMessage(err));
+      if (!background && request === latest.current) toast.error("Couldn't run the report", errorMessage(err));
     } finally {
-      setRunning(false);
+      if (!background) setRunning(false);
     }
   };
+
+  // A report that includes today re-runs on its own so new orders show up without pressing Run.
+  useAutoRefresh(() => run(current, range, { background: true }), active && result !== null && range.to >= isoDate());
 
   useEffect(() => {
     if (refreshKey > 0 && result) run();

@@ -135,6 +135,98 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- List tabs (menu, inventory, employees) ---------- */
+.table-count {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.data-table tbody tr.row-muted td {
+  color: var(--muted);
+}
+
+/* ---------- Inventory ---------- */
+.inventory-tab {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-summary {
+  padding: 16px 20px 4px;
+  background: var(--surface);
+}
+
+.inventory-note {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ingredient-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+
+.ingredient-stats > div {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.ingredient-stats dt {
+  font-size: 12px;
+  color: var(--subtle);
+}
+
+.ingredient-stats dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-alert {
+  color: var(--alert-fg);
+}
+
+.ingredient-danger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ingredient-danger > span {
+  margin-right: auto;
+}
+
+.ingredient-danger p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.restock-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 /* ---------- Seasonal item dialog ---------- */
 .recipe-picker {
   display: flex;
@@ -157,7 +249,11 @@
   overflow: auto;
 }
 
-.recipe-table td:last-child {
+.recipe-table.restock-table {
+  max-height: min(60vh, 480px);
+}
+
+.recipe-table:not(.restock-table) td:last-child {
   width: 1%;
   text-align: right;
 }
