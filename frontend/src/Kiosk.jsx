@@ -78,7 +78,14 @@ export default function Kiosk() {
     if (picks.length > 0) result.unshift({ category: PICKS_SECTION, drinks: picks });
     return result;
   }, [items, suggestions.data]);
-
+  
+    const startedOnPicks = useRef(false);
+    useLayoutEffect(() => {
+      if (startedOnPicks.current || !menu.data || suggestions.loading) return;
+      startedOnPicks.current = true;
+      trackRef.current?.scrollTo({ left: 0 });
+      setActiveSection(sections[0]?.category ?? null);
+    }, [menu.data, suggestions.loading, sections]);
   // Intro: in each column, tiles start stacked flush on the bottom edge (bottom tile on the floor,
   // the next one resting on top of it). Only the y position animates; x and rotation never change.
   useLayoutEffect(() => {
