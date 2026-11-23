@@ -154,8 +154,40 @@
 }
 
 .inventory-summary {
-  padding: 16px 20px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 24px;
+  padding: 8px 20px;
   background: var(--surface);
+}
+
+.inventory-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 0;
+}
+
+.inventory-stats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.inventory-stats dt {
+  font-size: 12px;
+  color: var(--subtle);
+}
+
+.inventory-stats dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-summary .inventory-note {
+  margin: 0 0 0 auto;
 }
 
 .inventory-note {

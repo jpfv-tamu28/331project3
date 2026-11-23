@@ -96,14 +96,21 @@ export default function InventoryTab({ refreshKey }) {
   return (
     <div className="inventory-tab">
       <div className="inventory-summary">
-        <StatTiles tiles={[
-          { label: 'Ingredients', value: items.length },
-          { label: 'Out of stock', value: counts.out },
-          { label: 'Below reorder level', value: counts.out + counts.low },
-          { label: `Reorder within ${SOON_DAYS} days`, value: counts.soon },
-        ]} />
+        <dl className="inventory-stats">
+          {[
+            { label: 'Ingredients', value: items.length },
+            { label: 'Out of stock', value: counts.out, alert: counts.out > 0 },
+            { label: 'Below reorder level', value: counts.out + counts.low, alert: counts.out + counts.low > 0 },
+            { label: `Reorder within ${SOON_DAYS} days`, value: counts.soon },
+          ].map((t) => (
+            <div key={t.label}>
+              <dt>{t.label}</dt>
+              <dd className={t.alert ? 'text-alert' : undefined}>{t.value}</dd>
+            </div>
+          ))}
+        </dl>
         <p className="inventory-note">
-          Usage is averaged over the last {USAGE_WINDOW_DAYS} days of sales.
+          Usage averaged over the last {USAGE_WINDOW_DAYS} days of sales.
         </p>
       </div>
       <TableView

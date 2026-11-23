@@ -505,7 +505,7 @@ select.field {
 }
 
 .data-table td {
-  height: 34px;
+  height: 18px;
   padding: 0 16px;
   border-bottom: 1px solid var(--row-line);
 }
